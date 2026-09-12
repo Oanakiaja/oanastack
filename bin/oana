@@ -276,31 +276,35 @@ feature_done() {
   fi
   need_cmd wt
 
-  python3 - "$sf" <<'PY_DONE' | while IFS=$'\t' read -r alias repo wt_path; do
+  python3 - "$sf" "$slug" "$BRANCH_PREFIX" <<'PY_DONE' | while IFS=$'\t' read -r alias repo wt_path branch; do
 import json, sys
-with open(sys.argv[1], "r", encoding="utf-8") as f:
+path, slug, prefix = sys.argv[1:4]
+with open(path, "r", encoding="utf-8") as f:
     data = json.load(f)
+branch = data.get("branch") or f"{prefix}/{slug}"
 for e in data.get("entries", []):
-    print(f"{e.get('alias','')}\t{e.get('repo','')}\t{e.get('worktree','')}")
+    print(f"{e.get('alias','')}\t{e.get('repo','')}\t{e.get('worktree','')}\t{branch}")
 PY_DONE
     [ -n "$repo" ] || continue
+    [ -n "$branch" ] || branch="${BRANCH_PREFIX}/${slug}"
     if [ ! -e "$wt_path" ]; then
       echo "$alias: already missing $wt_path"
       continue
     fi
 
+    # wt remove expects a branch name (e.g. feature/<slug>), not a worktree path.
     if [ "$force" = "1" ]; then
-      if wt -C "$repo" remove -f -D "$wt_path" 2>/dev/null; then
+      if wt -C "$repo" remove -f -D "$branch" 2>/dev/null; then
         :
-      elif wt -C "$repo" remove -f "$wt_path" 2>/dev/null; then
+      elif wt -C "$repo" remove -f "$branch" 2>/dev/null; then
         :
       else
-        wt -C "$repo" remove "$wt_path"
+        wt -C "$repo" remove "$branch"
       fi
     else
-      wt -C "$repo" remove "$wt_path"
+      wt -C "$repo" remove "$branch"
     fi
-    echo "$alias: removed $wt_path"
+    echo "$alias: removed $branch ($wt_path)"
   done
 
   rm -f "$sf"

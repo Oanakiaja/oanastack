@@ -1,11 +1,23 @@
-# market
+# oanastack
+
+跨项目的 Agent 工程原则与任务模板；工程入口 `skills/oanastack/` + CLI `bin/oana`.
 
 Recording reusable scripts, CLI, Skill, Prompt, Plugins.
 
 ## Skill 安装
 
+优先软链到 `~/.agents/skills/oanastack`：
+
 ```bash
-REPO_ROOT=/path/to/oanastack
+REPO_ROOT="$HOME/Documents/github/oanastack"
+mkdir -p ~/.agents/skills
+ln -s "$REPO_ROOT/skills/oanastack" ~/.agents/skills/oanastack
+```
+
+可选：同时链到 Claude 技能目录：
+
+```bash
+mkdir -p ~/.claude/skills
 ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ```
 
@@ -18,7 +30,7 @@ ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ## oana CLI
 
 ```bash
-REPO_ROOT=/path/to/oanastack
+REPO_ROOT="$HOME/Documents/github/oanastack"
 mkdir -p ~/.local/bin
 ln -s "$REPO_ROOT/bin/oana" ~/.local/bin/oana
 # 或把 "$REPO_ROOT/bin" 加到 PATH
@@ -28,7 +40,7 @@ ln -s "$REPO_ROOT/bin/oana" ~/.local/bin/oana
 
 ```bash
 mkdir -p ~/.config/oanastack
-REPO_ROOT=/path/to/oanastack
+REPO_ROOT="$HOME/Documents/github/oanastack"
 cp "$REPO_ROOT/.config/oanastack/repos.example.toml" ~/.config/oanastack/repos.toml
 ```
 
