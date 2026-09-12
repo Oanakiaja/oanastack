@@ -39,7 +39,7 @@ alias 名称可自定义，建议统一用 kebab-case（历史下划线 alias �
 
 ```bash
 oana repos
-oana feature start agent-collab one-agent-ui work_agent_server
+oana feature start agent-collab one-agent-ui nexus
 oana feature list
 oana feature paths agent-collab
 oana feature hint agent-collab
