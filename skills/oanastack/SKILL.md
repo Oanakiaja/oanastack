@@ -9,6 +9,7 @@ description: oanastack 协作规则与常见工作流（开 feature、多仓并�
 
 - 原则：`references/principles.md`
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feature.md`
+- Codex 线程 / exec vs 交互 / effort / 反膨胀：见 `references/feature-session.md` 对应节
 - 功能开发：`references/feature.md`
 - 盯 PR / CI：`playbooks/babysit-lite.md`（分类卡：`references/ci-classify.md`）
 - 合入 / land / ship：`playbooks/shipping-lite.md`
