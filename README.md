@@ -33,6 +33,7 @@ cp "$REPO_ROOT/.config/oanastack/repos.example.toml" ~/.config/oanastack/repos.t
 ```
 
 复制后请按你的本地仓库路径修改 `~/.config/oanastack/repos.toml` 中每个 repo alias。
+alias 名称可自定义，建议统一用 kebab-case（历史下划线 alias 也兼容）。
 
 ### 常用命令
 
