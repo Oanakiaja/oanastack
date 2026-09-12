@@ -1,0 +1,4 @@
+interface:
+  display_name: "oanastack"
+  short_description: "跨项目原则与任务模板：feature-session / oana / playbook，以可验证证据持续演进实践"
+  default_prompt: "使用 $oanastack 处理当前工程任务，选择对应模板或 playbook，并用实际证据验证结果。"

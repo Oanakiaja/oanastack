@@ -12,14 +12,16 @@
 | --- | --- |
 | 开 feature / 多仓并行 / 实现新行为 | `feature.md`（先读 `../references/feature-session.md`） |
 | 盯 PR / 变绿 / CI / review 线程 | `babysit-lite.md` |
+| 合入 / land / merge / ship | `shipping-lite.md` |
 | 清理 worktree / `oana feature done` | `cleanup.md` |
 
-明确要求 merge / land / ship 的请求**不是** babysit：停在 merge-ready 之后交给人（或后续独立的 shipping 动作）。本目录不提供 shipping playbook。
+明确要求 merge / land / ship 的请求**不是** babysit：merge-ready 之后走 `shipping-lite.md`。
 
 ## 索引
 
 - `feature.md` — 先开 session 与 worktree，再证据导向实现。
 - `babysit-lite.md` — 只推 merge frontier 到 merge-ready，不 merge。
+- `shipping-lite.md` — 独立验证后自底向上 squash 合入连续已验证 run。
 - `cleanup.md` — 按 `oana feature done` 清理；dirty 需确认。
 
 配套参考卡：`../references/ci-classify.md`。
