@@ -64,10 +64,17 @@ oana feature done agent-collab
 
 薄 playbook 层，不替换 `oana` 骨干（一个 feature → 多仓 worktree → 做完再批量 merge）。Agent 按任务匹配后把步骤抄到 todo。索引与路由见 `skills/oanastack/playbooks/README.md`。
 
-- 开 feature / 多仓：`playbooks/feature.md`
-- 盯 PR / CI：`playbooks/babysit-lite.md`
-- 合入 / land / ship：`playbooks/shipping-lite.md`
+- 调研：`playbooks/research.md`
+- 开 feature / 多仓：`playbooks/feat.md`
+- 修 bug：`playbooks/bugfix.md`
+- 验证：`playbooks/test.md`
+- 看 diff：`playbooks/review.md`
+- 盯 PR 到 merge-ready：`playbooks/babysit.md`
+- CI 分诊：`playbooks/cicd.md`
 - 清理 worktree：`playbooks/cleanup.md`
+- 沉淀 / 复盘：`playbooks/reflect.md`
+
+merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由 owner 合入。
 
 ## 原有工具记录
 
