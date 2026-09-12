@@ -1,0 +1,8 @@
+# 复制到 ~/.config/oanastack/repos.toml 后按实际路径修改
+
+[repos]
+one-agent-ui = "~/Documents/vm/one-agent-ui"
+work_agent_server = "~/Documents/vm/work_agent_server"
+nexus = "~/Documents/vm/nexus"
+sandbox = "~/Documents/vm/sandbox"
+tool_proxy = "~/Documents/vm/tool_proxy"
