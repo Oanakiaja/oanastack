@@ -1,6 +1,7 @@
 # 复制到 ~/.config/oanastack/repos.toml 后按实际路径修改
 
 [repos]
+# alias 建议 kebab-case；右侧路径使用你的真实本地目录名（可含下划线）
 one-agent-ui = "~/Documents/vm/one-agent-ui"
 work-agent-server = "~/Documents/vm/work_agent_server"
 nexus = "~/Documents/vm/nexus"

@@ -37,6 +37,8 @@ alias 名称可自定义，建议统一用 kebab-case。
 
 ### 常用命令
 
+以下子命令由 `bin/oana` 提供，完整参数以 `oana --help` / `oana feature --help` 为准。
+
 ```bash
 oana repos
 oana feature start agent-collab one-agent-ui nexus
