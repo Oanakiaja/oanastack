@@ -5,7 +5,8 @@ Recording reusable scripts, CLI, Skill, Prompt, Plugins.
 ## Skill 安装
 
 ```bash
-ln -s /home/runner/work/oanastack/oanastack/skills/oanastack ~/.claude/skills/oanastack
+REPO_ROOT=/path/to/oanastack
+ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ```
 
 ## Feature Session + Worktree 约定
@@ -17,15 +18,17 @@ ln -s /home/runner/work/oanastack/oanastack/skills/oanastack ~/.claude/skills/oa
 ## oana CLI
 
 ```bash
-ln -s /home/runner/work/oanastack/oanastack/bin/oana ~/.local/bin/oana
-# 或把 /home/runner/work/oanastack/oanastack/bin 加到 PATH
+REPO_ROOT=/path/to/oanastack
+ln -s "$REPO_ROOT/bin/oana" ~/.local/bin/oana
+# 或把 "$REPO_ROOT/bin" 加到 PATH
 ```
 
 ### repo 映射配置
 
 ```bash
 mkdir -p ~/.config/oanastack
-cp /home/runner/work/oanastack/oanastack/.config/oanastack/repos.example.toml ~/.config/oanastack/repos.toml
+REPO_ROOT=/path/to/oanastack
+cp "$REPO_ROOT/.config/oanastack/repos.example.toml" ~/.config/oanastack/repos.toml
 ```
 
 ### 常用命令
