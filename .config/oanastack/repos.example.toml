@@ -2,7 +2,7 @@
 
 [repos]
 one-agent-ui = "~/Documents/vm/one-agent-ui"
-work_agent_server = "~/Documents/vm/work_agent_server"
+work-agent-server = "~/Documents/vm/work_agent_server"
 nexus = "~/Documents/vm/nexus"
 sandbox = "~/Documents/vm/sandbox"
-tool_proxy = "~/Documents/vm/tool_proxy"
+tool-proxy = "~/Documents/vm/tool_proxy"
