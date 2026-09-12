@@ -1,5 +1,7 @@
 # Feature Session 协作规范
 
+步骤卡见 `../playbooks/feat.md`。清理纪律见 `../playbooks/cleanup.md`。
+
 ## 1) 工作单元
 - 一个 feature = 一个 agent / Codex 线程。
 - 线程命名建议：`<repo>-<feature>`，多仓可共用同一个 feature slug。

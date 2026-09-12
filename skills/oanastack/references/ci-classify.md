@@ -1,6 +1,6 @@
 # CI 分类卡
 
-盯 PR / CI 时先分类，再决定重试或改代码。Babysit 流程见 `../playbooks/babysit-lite.md`。
+盯 PR / CI 时先分类，再决定重试或改代码。分诊步骤见 `../playbooks/cicd.md`；盯整个 PR 到 merge-ready 见 `../playbooks/babysit.md`。
 
 状态以 `gh pr checks` / `gh pr view` 为准，不要求 Graphite。
 
