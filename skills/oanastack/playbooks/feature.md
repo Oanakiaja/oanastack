@@ -2,11 +2,11 @@
 
 **先隔离，再改代码。** 一个 feature 一条线程；多仓必须先有 worktree。实现步骤对齐 `../references/feature.md` 与 `../references/feature-session.md`。
 
-匹配：开 feature、多仓并行、新行为/改行为。短任务可用 `codex exec`，长 feature 留在这条 session。
+匹配：开 feature、多仓并行、新行为/改行为。短任务用 `codex exec`（或等价非交互），长 feature 留在这条 session；做完或接受后停，旁路修复开新线程。effort / 卫生 / 协调见 `../references/feature-session.md`。
 
 ## 步骤（原样抄到 todo）
 
-1. **开 feature session + worktree。** `oana feature start <slug> [repo-alias...]`；用 `oana feature hint <slug>` 取线程名与 cwd。session cwd 必须指向 worktree，禁止在主 checkout 上开发。
+1. **开 feature session + worktree。** `oana feature start <slug> [repo-alias...]`；用 `oana feature hint <slug>` 取线程名与 cwd。session cwd 必须指向 worktree，禁止在主 checkout 上开发。已有 agent 占用该 feature 时不要平行开 session。
 2. **写验收标准与边界。** 可验证、可失败；写清不做什么。
 3. **小步实现。** 优先可验证改动；每步能独立证明。多仓按 alias 在各自 worktree 提交，不串仓污染。
 4. **提交前验证并留下证据。** 跑目标验证（测试、复现路径、关键输出）。「编译过」不是验收。

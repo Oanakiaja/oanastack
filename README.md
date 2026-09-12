@@ -26,6 +26,7 @@ ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 - 一个 feature 对应一个 agent/Codex 线程（命名建议：`repo + feature`）。
 - 多仓 feature 时，每仓一个 worktree；session cwd 必须指向 worktree，而不是主 checkout。
 - 合并或放弃后要清理 worktree，保持主 checkout 干净。
+- Codex 短/长、effort、卫生、协调：`skills/oanastack/references/feature-session.md`。
 
 ## oana CLI
 
