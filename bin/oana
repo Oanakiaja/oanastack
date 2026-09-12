@@ -1,0 +1,410 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+STATE_DIR="${HOME}/.local/state/oanastack/features"
+BRANCH_PREFIX="${OANASTACK_BRANCH_PREFIX:-feature}"
+
+err() { echo "oana: $*" >&2; }
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    err "missing command: $1"
+    if [ "$1" = "wt" ]; then
+      err "install worktrunk first: brew install worktrunk"
+    fi
+    exit 1
+  fi
+}
+
+expand_path() {
+  local p="$1"
+  case "$p" in
+    ~) printf '%s\n' "$HOME" ;;
+    ~/*) printf '%s/%s\n' "$HOME" "${p#~/}" ;;
+    *) printf '%s\n' "$p" ;;
+  esac
+}
+
+config_file() {
+  local env_cfg home_cfg repo_cfg
+  env_cfg="${OANASTACK_REPOS:-}"
+  home_cfg="${HOME}/.config/oanastack/repos.toml"
+  repo_cfg="${REPO_ROOT}/.config/oanastack/repos.toml"
+
+  if [ -n "$env_cfg" ]; then
+    env_cfg="$(expand_path "$env_cfg")"
+    if [ ! -f "$env_cfg" ]; then
+      err "OANASTACK_REPOS points to missing file: $env_cfg"
+      exit 1
+    fi
+    printf '%s\n' "$env_cfg"
+    return
+  fi
+  if [ -f "$home_cfg" ]; then
+    printf '%s\n' "$home_cfg"
+    return
+  fi
+  if [ -f "$repo_cfg" ]; then
+    printf '%s\n' "$repo_cfg"
+    return
+  fi
+
+  err "repos config not found. tried:"
+  err "  - OANASTACK_REPOS"
+  err "  - $home_cfg"
+  err "  - $repo_cfg"
+  err "copy ${REPO_ROOT}/.config/oanastack/repos.example.toml to ~/.config/oanastack/repos.toml"
+  exit 1
+}
+
+read_repos_json() {
+  local cfg
+  cfg="$(config_file || true)"
+  if [ -z "$cfg" ] || [ ! -f "$cfg" ]; then
+    exit 1
+  fi
+  python3 - "$cfg" <<'PY_REPOS'
+import json, os, sys
+cfg = sys.argv[1]
+try:
+    import tomllib
+except Exception:
+    print("oana: python tomllib unavailable", file=sys.stderr)
+    sys.exit(1)
+
+with open(cfg, "rb") as f:
+    data = tomllib.load(f)
+repos = data.get("repos") or {}
+if not isinstance(repos, dict) or not repos:
+    print(f"oana: no [repos] in {cfg}", file=sys.stderr)
+    sys.exit(1)
+out = {}
+for alias, path in repos.items():
+    if not isinstance(path, str):
+        print(f"oana: invalid path for alias {alias}", file=sys.stderr)
+        sys.exit(1)
+    out[str(alias)] = os.path.abspath(os.path.expanduser(path))
+print(json.dumps(out, ensure_ascii=False))
+PY_REPOS
+}
+
+repo_path_by_alias() {
+  local alias="$1"
+  local repos_json
+  repos_json="$(read_repos_json)"
+  python3 - "$alias" "$repos_json" <<'PY_ALIAS'
+import json, sys
+alias = sys.argv[1]
+repos = json.loads(sys.argv[2])
+path = repos.get(alias)
+if not path:
+    print(f"oana: unknown repo alias: {alias}", file=sys.stderr)
+    sys.exit(1)
+print(path)
+PY_ALIAS
+}
+
+all_aliases() {
+  local repos_json
+  repos_json="$(read_repos_json)"
+  python3 - "$repos_json" <<'PY_ALIASES'
+import json, sys
+repos = json.loads(sys.argv[1])
+for key in repos.keys():
+    print(key)
+PY_ALIASES
+}
+
+ensure_state_dir() {
+  mkdir -p "$STATE_DIR"
+}
+
+state_file() {
+  local slug="$1"
+  printf '%s/%s.json\n' "$STATE_DIR" "$slug"
+}
+
+find_worktree_path() {
+  local repo_path="$1" branch="$2"
+  git -C "$repo_path" worktree list --porcelain | awk -v target="refs/heads/${branch}" '
+    $1=="worktree" { w=$2 }
+    $1=="branch" && $2==target { print w; exit }
+  '
+}
+
+feature_start() {
+  local slug="$1"; shift || true
+  need_cmd wt
+  ensure_state_dir
+
+  local branch aliases=()
+  branch="${BRANCH_PREFIX}/${slug}"
+
+  if [ "$#" -gt 0 ]; then
+    aliases=("$@")
+  else
+    while IFS= read -r a; do
+      aliases+=("$a")
+    done < <(all_aliases)
+  fi
+
+  if [ "${#aliases[@]}" -eq 0 ]; then
+    err "no repos selected"
+    exit 1
+  fi
+
+  local entries_json="[]"
+  local alias repo_path wt_path
+  for alias in "${aliases[@]}"; do
+    repo_path="$(repo_path_by_alias "$alias")"
+    if [ ! -d "$repo_path" ]; then
+      err "repo path not found for $alias: $repo_path"
+      exit 1
+    fi
+
+    wt -C "$repo_path" switch --create --no-cd -y "$branch"
+    wt_path="$(find_worktree_path "$repo_path" "$branch")"
+    if [ -z "$wt_path" ]; then
+      err "cannot find worktree for $alias ($branch)"
+      exit 1
+    fi
+
+    entries_json="$(python3 - "$entries_json" "$alias" "$repo_path" "$wt_path" <<'PY_ENTRY'
+import json, sys
+arr = json.loads(sys.argv[1])
+arr.append({"alias": sys.argv[2], "repo": sys.argv[3], "worktree": sys.argv[4]})
+print(json.dumps(arr, ensure_ascii=False))
+PY_ENTRY
+)"
+  done
+
+  local sf
+  sf="$(state_file "$slug")"
+  python3 - "$sf" "$slug" "$branch" "$entries_json" <<'PY_WRITE'
+import json, sys, datetime
+path, slug, branch, entries = sys.argv[1:5]
+obj = {
+    "slug": slug,
+    "branch": branch,
+    "created_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "entries": json.loads(entries),
+}
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(obj, f, ensure_ascii=False, indent=2)
+print(json.dumps(obj, ensure_ascii=False, indent=2))
+PY_WRITE
+}
+
+feature_list() {
+  ensure_state_dir
+  local found=0
+  local f
+  for f in "$STATE_DIR"/*.json; do
+    [ -e "$f" ] || continue
+    found=1
+    python3 - "$f" <<'PY_LIST'
+import json, os, sys
+f = sys.argv[1]
+with open(f, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+slug = data.get("slug", os.path.basename(f)[:-5])
+entries = data.get("entries", [])
+missing = [e.get("worktree") for e in entries if not os.path.isdir(e.get("worktree", ""))]
+status = "ok" if not missing else f"missing:{len(missing)}"
+print(f"{slug}\t{len(entries)} repos\t{status}")
+for m in missing:
+    print(f"  - missing {m}")
+PY_LIST
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "no active features"
+  fi
+}
+
+feature_paths() {
+  local slug="$1" sf
+  sf="$(state_file "$slug")"
+  if [ ! -f "$sf" ]; then
+    err "feature not found: $slug"
+    exit 1
+  fi
+  python3 - "$sf" <<'PY_PATHS'
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+for e in data.get("entries", []):
+    print(f"{e.get('alias')}\t{e.get('worktree')}")
+PY_PATHS
+}
+
+feature_hint() {
+  local slug="$1"
+  local sf
+  sf="$(state_file "$slug")"
+  if [ ! -f "$sf" ]; then
+    err "feature not found: $slug"
+    exit 1
+  fi
+  local branch
+  branch="$(python3 - "$sf" <<'PY_BRANCH'
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+print(data.get("branch", ""))
+PY_BRANCH
+)"
+  echo "Session 命名建议: <repo> + ${slug}"
+  echo "长任务请在 feature session 持续推进；短任务可用 codex exec。"
+  echo "建议分支: ${branch}"
+  echo "以下 cwd 可直接用于 agent/codex:"
+  feature_paths "$slug"
+}
+
+feature_done() {
+  local slug="$1" force="0" sf
+  shift || true
+  if [ "${1:-}" = "--force" ]; then
+    force="1"
+  fi
+
+  sf="$(state_file "$slug")"
+  if [ ! -f "$sf" ]; then
+    err "feature not found: $slug"
+    exit 1
+  fi
+  need_cmd wt
+
+  python3 - "$sf" "$slug" "$BRANCH_PREFIX" <<'PY_DONE' | while IFS=$'\t' read -r alias repo wt_path branch; do
+import json, sys
+path, slug, prefix = sys.argv[1:4]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+branch = data.get("branch") or f"{prefix}/{slug}"
+for e in data.get("entries", []):
+    print(f"{e.get('alias','')}\t{e.get('repo','')}\t{e.get('worktree','')}\t{branch}")
+PY_DONE
+    [ -n "$repo" ] || continue
+    [ -n "$branch" ] || branch="${BRANCH_PREFIX}/${slug}"
+    if [ ! -e "$wt_path" ]; then
+      echo "$alias: already missing $wt_path"
+      continue
+    fi
+
+    # wt remove expects a branch name (e.g. feature/<slug>), not a worktree path.
+    if [ "$force" = "1" ]; then
+      if wt -C "$repo" remove -f -D "$branch" 2>/dev/null; then
+        :
+      elif wt -C "$repo" remove -f "$branch" 2>/dev/null; then
+        :
+      else
+        wt -C "$repo" remove "$branch"
+      fi
+    else
+      wt -C "$repo" remove "$branch"
+    fi
+    echo "$alias: removed $branch ($wt_path)"
+  done
+
+  rm -f "$sf"
+  echo "feature removed: $slug"
+}
+
+repos_list() {
+  local repos_json
+  repos_json="$(read_repos_json)"
+  python3 - "$repos_json" <<'PY_REPOS_LIST'
+import json, sys
+repos = json.loads(sys.argv[1])
+for alias, path in repos.items():
+    print(f"{alias}\t{path}")
+PY_REPOS_LIST
+}
+
+show_help() {
+  cat <<'HELP_MAIN'
+Usage:
+  oana repos
+  oana feature start <slug> [repo-alias...]
+  oana feature list
+  oana feature paths <slug>
+  oana feature hint <slug>
+  oana feature done <slug> [--force]
+
+Config lookup order:
+  1) $OANASTACK_REPOS
+  2) ~/.config/oanastack/repos.toml
+  3) <repo>/.config/oanastack/repos.toml
+
+Branch prefix:
+  OANASTACK_BRANCH_PREFIX (default: feature)
+HELP_MAIN
+}
+
+show_feature_help() {
+  cat <<'HELP_FEATURE'
+Usage:
+  oana feature start <slug> [repo-alias...]
+  oana feature list
+  oana feature paths <slug>
+  oana feature hint <slug>
+  oana feature done <slug> [--force]
+HELP_FEATURE
+}
+
+main() {
+  case "${1:-}" in
+    -h|--help|help|"")
+      show_help
+      ;;
+    repos)
+      shift
+      case "${1:-}" in
+        -h|--help) show_help ;;
+        "") repos_list ;;
+        *) err "unknown repos arg: $1"; exit 1 ;;
+      esac
+      ;;
+    feature)
+      case "${2:-}" in
+        -h|--help|"") show_feature_help ;;
+        start)
+          [ "${3:-}" = "" ] && { err "missing slug"; exit 1; }
+          slug="$3"
+          shift 3
+          feature_start "$slug" "$@"
+          ;;
+        list)
+          feature_list
+          ;;
+        paths)
+          [ "${3:-}" = "" ] && { err "missing slug"; exit 1; }
+          feature_paths "$3"
+          ;;
+        hint)
+          [ "${3:-}" = "" ] && { err "missing slug"; exit 1; }
+          feature_hint "$3"
+          ;;
+        done)
+          [ "${3:-}" = "" ] && { err "missing slug"; exit 1; }
+          slug="$3"
+          shift 3
+          feature_done "$slug" "$@"
+          ;;
+        *)
+          err "unknown feature command: ${2:-}"
+          show_feature_help
+          exit 1
+          ;;
+      esac
+      ;;
+    *)
+      err "unknown command: $1"
+      show_help
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
