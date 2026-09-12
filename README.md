@@ -60,6 +60,14 @@ oana feature hint agent-collab
 oana feature done agent-collab
 ```
 
+## Playbooks（借鉴 pstack）
+
+薄 playbook 层，不替换 `oana` 骨干（一个 feature → 多仓 worktree → 做完再批量 merge）。Agent 按任务匹配后把步骤抄到 todo。索引与路由见 `skills/oanastack/playbooks/README.md`。
+
+- 开 feature / 多仓：`playbooks/feature.md`
+- 盯 PR / CI：`playbooks/babysit-lite.md`
+- 清理 worktree：`playbooks/cleanup.md`
+
 ## 原有工具记录
 
 ```bash
