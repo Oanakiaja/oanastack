@@ -31,6 +31,8 @@ REPO_ROOT=/path/to/oanastack
 cp "$REPO_ROOT/.config/oanastack/repos.example.toml" ~/.config/oanastack/repos.toml
 ```
 
+复制后请按你的本地仓库路径修改 `~/.config/oanastack/repos.toml` 中每个 repo alias。
+
 ### 常用命令
 
 ```bash
