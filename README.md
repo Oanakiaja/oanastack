@@ -19,6 +19,7 @@ ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 
 ```bash
 REPO_ROOT=/path/to/oanastack
+mkdir -p ~/.local/bin
 ln -s "$REPO_ROOT/bin/oana" ~/.local/bin/oana
 # 或把 "$REPO_ROOT/bin" 加到 PATH
 ```
