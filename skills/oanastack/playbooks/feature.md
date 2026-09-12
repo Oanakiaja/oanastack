@@ -10,7 +10,7 @@
 2. **写验收标准与边界。** 可验证、可失败；写清不做什么。
 3. **小步实现。** 优先可验证改动；每步能独立证明。多仓按 alias 在各自 worktree 提交，不串仓污染。
 4. **提交前验证并留下证据。** 跑目标验证（测试、复现路径、关键输出）。「编译过」不是验收。
-5. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit-lite.md`。
+5. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit-lite.md`，合入 / land / ship 走 `shipping-lite.md`。
 6. **合并或放弃后清理。** `oana feature done <slug>`，纪律见 `cleanup.md`。
 
 ## 工具边界

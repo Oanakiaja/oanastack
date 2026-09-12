@@ -4,7 +4,7 @@
 
 匹配：「盯这个 PR」「变绿」「merge-ready」「看 CI」「处理 review / bugbot 评论」「check on PR X」。开 PR 本身不自动进入本 playbook。
 
-要求 land / ship / merge 时**不要**在这里做：那是 shipping。本 playbook 到 merge-ready 为止。
+要求 land / ship / merge 时**不要**在这里做：转到 `shipping-lite.md`。本 playbook 到 merge-ready 为止。
 
 分类细则见 `../references/ci-classify.md`。
 
@@ -29,7 +29,7 @@
 
 ## 不做
 
-- 不 merge、不 arm merge-when-ready（那是 shipping）。
+- 不 merge、不 arm merge-when-ready（合入 / land / ship 走 `shipping-lite.md`）。
 - 不改 stack topology（不改 base、不做整栈 rebase / force-push）；需要 rebase 时上报给 feature owner。
 - 不引入 Graphite 作为前置。
 

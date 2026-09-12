@@ -1,6 +1,6 @@
 ---
 name: oanastack
-description: oanastack 协作规则与常见工作流（开 feature、多仓并行、盯 PR/CI、清理 worktree、修复与复盘）
+description: oanastack 协作规则与常见工作流（开 feature、多仓并行、盯 PR/CI、合入/land/ship、清理 worktree、修复与复盘）
 ---
 
 # oanastack Skill
@@ -11,6 +11,7 @@ description: oanastack 协作规则与常见工作流（开 feature、多仓并�
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feature.md`
 - 功能开发：`references/feature.md`
 - 盯 PR / CI：`playbooks/babysit-lite.md`（分类卡：`references/ci-classify.md`）
+- 合入 / land / ship：`playbooks/shipping-lite.md`
 - 清理 worktree：`playbooks/cleanup.md`
 - 缺陷修复：`references/bug-fix.md`
 - 复盘沉淀：`references/reflect.md`

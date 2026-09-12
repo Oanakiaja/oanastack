@@ -66,6 +66,7 @@ oana feature done agent-collab
 
 - 开 feature / 多仓：`playbooks/feature.md`
 - 盯 PR / CI：`playbooks/babysit-lite.md`
+- 合入 / land / ship：`playbooks/shipping-lite.md`
 - 清理 worktree：`playbooks/cleanup.md`
 
 ## 原有工具记录
