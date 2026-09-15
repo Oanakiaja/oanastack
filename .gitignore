@@ -1,0 +1,5 @@
+# nested TS packages
+packages/*/node_modules/
+packages/*/dist/
+packages/*/coverage/
+*.tsbuildinfo

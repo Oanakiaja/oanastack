@@ -1,0 +1,60 @@
+{
+  "name": "@oana/grokbot-coding-agent",
+  "version": "0.2.0",
+  "description": "Harness-agnostic TypeScript SDK + CLI for first-class coding-agent sessions.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "grokc": "dist/cli.js",
+    "grokbot-coding-agent": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "postbuild": "node scripts/ensure-shebang.mjs",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run test && npm run build"
+  },
+  "keywords": [
+    "coding-agent",
+    "codex",
+    "cli",
+    "grokbot"
+  ],
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Oanakiaja/oanastack.git",
+    "directory": "packages/grokbot-coding-agent"
+  },
+  "bugs": {
+    "url": "https://github.com/Oanakiaja/oanastack/issues"
+  },
+  "homepage": "https://github.com/Oanakiaja/oanastack/tree/main/packages/grokbot-coding-agent#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}
