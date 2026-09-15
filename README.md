@@ -77,7 +77,7 @@ oana grokc approve <sessionId> --request <requestId> --decision accept
 
 ### `oana grokc` 嵌套包
 
-本地 coding-agent CLI 已并入本仓 `packages/grokbot-coding-agent/`（npm 名仍是 `@oana/grokbot-coding-agent`）。需要 Node.js >= 20。
+本地 coding-agent CLI **只住在本仓** `packages/grokbot-coding-agent/`（npm 名仍是 `@oana/grokbot-coding-agent`）。需要 Node.js >= 20。不要再 clone / 维护独立的 grokc CLI 仓库；后续工作只在 oanastack。
 
 ```bash
 cd packages/grokbot-coding-agent

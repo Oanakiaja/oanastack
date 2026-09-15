@@ -1,6 +1,6 @@
 # @oana/grokbot-coding-agent
 
-Vendored into [oanastack](https://github.com/Oanakiaja/oanastack) from `grokbot-coding-agent-cli` (`f6e937af`). Canonical invoke is **`oana grokc …`**. The standalone `grokc` / `grokbot-coding-agent` bins are optional aliases.
+Product home is **this oanastack tree** (`packages/grokbot-coding-agent/`). Canonical invoke is **`oana grokc …`**. Do not clone, link, or maintain a separate grokc CLI repo. The standalone `grokc` / `grokbot-coding-agent` bins are optional aliases of `oana grokc`.
 
 Grok Bot / agent skill: [`../../skills/grokc-local-coding-agents/SKILL.md`](../../skills/grokc-local-coding-agents/SKILL.md)
 

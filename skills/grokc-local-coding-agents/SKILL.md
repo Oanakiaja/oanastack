@@ -1,13 +1,15 @@
 ---
 name: grokc local coding agents
-description: use this when driving local coding-agent sessions via oana grokc (launch/reply/watch/approve), concurrent Codex turns, or forwarding Codex approvals to a human. Do not use for Cursor Cloud Agent remote sessions, npm publish, homemade worktree dirs, a second worktree plane besides oana/wt, or auto-approving Codex tool calls unless the user explicitly asked.
+description: use this when driving local coding-agent sessions via oana grokc (launch/reply/watch/approve), concurrent Codex turns, or forwarding Codex approvals to a human. Do not use for Cursor Cloud Agent remote sessions, npm publish, homemade worktree dirs, a second worktree plane besides oana/wt, a standalone grokc CLI repo, or auto-approving Codex tool calls unless the user explicitly asked.
 ---
 
 # grokc local coding agents
 
 Drive **local** coding-agent sessions with **`oana grokc`**. The bot-facing surface mirrors Cursor CloudAgent verbs (`launch` / `reply` / `get` / `list` / `watch` / `dump` / `cancel` / `archive` / `unarchive` / `rename` / `approve`). Codex (`codex app-server` JSONL) is the first working harness.
 
-Canonical invoke is `oana grokc …` (oanastack owns development skills). `oana agent …` is the same subcommand. Standalone `grokc` is an optional thin alias (`bin/grokc` → `oana grokc`).
+Canonical invoke is `oana grokc …`. Product home is **oanastack only** (`packages/grokbot-coding-agent/`). `oana agent …` is the same subcommand. Standalone `grokc` is an optional thin alias (`bin/grokc` → `oana grokc`).
+
+Do **not** clone, link, or treat a separate grokc CLI repository as the product home. All future grokc work lives in this repo.
 
 Package: `packages/grokbot-coding-agent/` (`@oana/grokbot-coding-agent`). Build once if `dist/cli.js` is missing:
 
@@ -29,6 +31,7 @@ Do **not** use this skill for:
 - Pointing two live sessions at the same dirty worktree
 - Changing CloudAgent session verbs
 - Teaching plain `git worktree add` as the isolation plane
+- Sending anyone to a standalone grokc CLI checkout as the product home
 
 ## Feature worktrees first
 

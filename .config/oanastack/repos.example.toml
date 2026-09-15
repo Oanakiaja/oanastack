@@ -7,6 +7,5 @@ work-agent-server = "~/Documents/vm/work_agent_server"
 nexus = "~/Documents/vm/nexus"
 sandbox = "~/Documents/vm/sandbox"
 tool-proxy = "~/Documents/vm/tool_proxy"
-# Former standalone checkout; coding-agent CLI now lives in oanastack.
-# grokbot-coding-agent-cli = "~/Documents/github/grokbot-coding-agent-cli"
-# Prefer: oana grokc …  (packages/grokbot-coding-agent)
+# grokc is not a mapped repo. Use `oana grokc` from this oanastack clone
+# (packages/grokbot-coding-agent). Do not add a standalone grokc checkout.
