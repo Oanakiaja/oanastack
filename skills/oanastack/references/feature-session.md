@@ -12,11 +12,13 @@
 
 ## 3) 工具选择
 - 短任务可使用 `codex exec`。
-- 长 feature 持续在 feature session 推进。
+- 长 feature 持续在 feature session 推进；本地 coding-agent 会话用 `oana grokc`（在 feature worktree cwd 内）。
 - 优先使用 `wt` / `oana`：
   - `oana feature start <slug> [repo-alias...]`
   - `oana feature paths <slug>`
   - `oana feature done <slug>`
+  - `oana grokc launch|reply|get|list|watch|dump|cancel|archive|rename|approve …`
+- 不要用 grokc 再造一套 worktree 目录；Worktrunk / `oana feature` 仍是唯一隔离平面。细则见 `../../grokc-local-coding-agents/SKILL.md`。
 
 ## 4) 清理
 - 合并或放弃后，立即清理 worktree，保持主 checkout 干净。

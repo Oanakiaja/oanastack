@@ -257,6 +257,7 @@ PY_BRANCH
 )"
   echo "Session 命名建议: <repo> + ${slug}"
   echo "长任务请在 feature session 持续推进；短任务可用 codex exec。"
+  echo "长 coding session 用 oana grokc（在下列 cwd 内）；不要另起 worktree 平面。"
   echo "建议分支: ${branch}"
   echo "以下 cwd 可直接用于 agent/codex:"
   feature_paths "$slug"
@@ -322,6 +323,40 @@ for alias, path in repos.items():
 PY_REPOS_LIST
 }
 
+GROKC_PKG_DIR="${REPO_ROOT}/packages/grokbot-coding-agent"
+GROKC_CLI="${GROKC_PKG_DIR}/dist/cli.js"
+
+ensure_grokc() {
+  if [ -f "$GROKC_CLI" ]; then
+    return
+  fi
+  if [ ! -f "$GROKC_PKG_DIR/package.json" ]; then
+    err "grokc package missing at ${GROKC_PKG_DIR}"
+    exit 1
+  fi
+  need_cmd node
+  need_cmd npm
+  err "building @oana/grokbot-coding-agent (dist/cli.js missing)…"
+  (
+    cd "$GROKC_PKG_DIR"
+    if [ ! -d node_modules ]; then
+      npm install
+    fi
+    npm run build
+  )
+  if [ ! -f "$GROKC_CLI" ]; then
+    err "build did not produce ${GROKC_CLI}"
+    err "run: (cd ${GROKC_PKG_DIR} && npm install && npm run build)"
+    exit 1
+  fi
+}
+
+run_grokc() {
+  ensure_grokc
+  need_cmd node
+  exec node "$GROKC_CLI" "$@"
+}
+
 show_help() {
   cat <<'HELP_MAIN'
 Usage:
@@ -331,6 +366,15 @@ Usage:
   oana feature paths <slug>
   oana feature hint <slug>
   oana feature done <slug> [--force]
+  oana grokc <action> [args...]
+  oana agent <action> [args...]
+
+Coding-agent sessions (CloudAgent verbs):
+  oana grokc launch|reply|get|list|watch|dump|cancel|archive|rename|approve …
+  oana grokc worktree create|list|remove …
+  Build once: (cd packages/grokbot-coding-agent && npm install && npm run build)
+  Missing dist/cli.js is built automatically on first oana grokc.
+  Standalone grokc is optional (bin/grokc forwards here).
 
 Config lookup order:
   1) $OANASTACK_REPOS
@@ -398,6 +442,14 @@ main() {
           exit 1
           ;;
       esac
+      ;;
+    grokc|agent)
+      shift
+      if [ "$#" -eq 0 ] || [ "${1:-}" = "help" ]; then
+        run_grokc --help
+      else
+        run_grokc "$@"
+      fi
       ;;
     *)
       err "unknown command: $1"

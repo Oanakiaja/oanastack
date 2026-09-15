@@ -21,6 +21,12 @@ mkdir -p ~/.claude/skills
 ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ```
 
+本地 coding-agent 用法 skill（`oana grokc`）：
+
+```bash
+ln -s "$REPO_ROOT/skills/grokc-local-coding-agents" ~/.agents/skills/grokc-local-coding-agents
+```
+
 ## Feature Session + Worktree 约定
 
 - 一个 feature 对应一个 agent/Codex 线程（命名建议：`repo + feature`）。
@@ -49,7 +55,7 @@ alias 名称可自定义，建议统一用 kebab-case。
 
 ### 常用命令
 
-以下子命令由 `bin/oana` 提供，完整参数以 `oana --help` / `oana feature --help` 为准。
+以下子命令由 `bin/oana` 提供，完整参数以 `oana --help` / `oana feature --help` / `oana grokc --help` 为准。
 
 ```bash
 oana repos
@@ -58,7 +64,31 @@ oana feature list
 oana feature paths agent-collab
 oana feature hint agent-collab
 oana feature done agent-collab
+
+# 长 coding session：在 feature worktree 内驱动本地 coding agent
+oana grokc launch --harness codex --cwd <worktree> --prompt "…"
+oana grokc reply <sessionId> --prompt "…"
+oana grokc get <sessionId> --json
+oana grokc watch <sessionId>
+oana grokc approve <sessionId> --request <requestId> --decision accept
 ```
+
+`oana agent …` 与 `oana grokc …` 相同。独立二进制 `grokc` 是可选薄别名（`bin/grokc` → `oana grokc`），不再作为顶层产品 CLI。
+
+### `oana grokc` 嵌套包
+
+本地 coding-agent CLI 已并入本仓 `packages/grokbot-coding-agent/`（npm 名仍是 `@oana/grokbot-coding-agent`）。需要 Node.js >= 20。
+
+```bash
+cd packages/grokbot-coding-agent
+npm install
+npm run build
+oana grokc --help
+```
+
+若 `dist/cli.js` 不存在，`oana grokc` 会在该目录自动 `npm install`（缺 node_modules 时）并 `npm run build`。用法 skill：`skills/grokc-local-coding-agents/SKILL.md`。
+
+Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另起一套目录。审批默认 pending，转给人工后再 `oana grokc approve`；只有用户明确要求时才用 `--auto-approve`。
 
 ## Playbooks（借鉴 pstack）
 
