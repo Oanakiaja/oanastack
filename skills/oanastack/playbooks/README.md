@@ -22,7 +22,7 @@
 
 **没有 shipping 卡。** merge / land / ship 是 owner-only：`babysit.md` 推到 merge-ready 后由 owner 合入。只写评论走 `review.md`，不要和 babysit 混用。
 
-共用纪律：禁止直接改生产环境配置；默认 `gh`，不要 Graphite；worktree 只用 `oana` / `wt`。长 coding session 用 `oana grokc`，仍挂在同一 worktree 平面（见 `../../grokc-local-coding-agents/SKILL.md`）。grokc 产品入口只在 oanastack，不要指向独立 grokc CLI 仓库。
+共用纪律：禁止直接改生产环境配置；默认 `gh`，不要 Graphite；worktree 只用 `oana` / `wt`。长 coding session 用 `oana grokc`，仍挂在同一 worktree 平面（见 `../references/grokc.md`）。grokc 产品入口只在 oanastack，不要指向独立 grokc CLI 仓库。
 
 ## 索引
 
@@ -36,4 +36,4 @@
 - `cleanup.md` — 按 `oana feature done` 清理；dirty 需确认。
 - `reflect.md` — 按复杂度/根因门槛沉淀或做架构反思。
 
-配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`。
+配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`、`../references/grokc.md`。
