@@ -10,8 +10,9 @@
 2. **写验收标准与边界。** 可验证、可失败；写清不做什么。
 3. **小步实现。** 优先可验证改动；每步能独立证明。多仓按 alias 在各自 worktree 提交，不串仓污染。
 4. **提交前验证并留下证据。** 目标验证走 `test.md`。「编译过」不是验收。
-5. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit.md`。merge / land / ship 是 owner-only：babysit 到 merge-ready 后由 owner 合入。
-6. **合并或放弃后清理。** `oana feature done <slug>`，纪律见 `cleanup.md`。复杂度/根因够深时走 `reflect.md`。
+5. **过代码风格门。** 开 PR 前对照 `../references/code-style.md` 扫本 diff：跟文件走、最小改动、一个意图。仓里有 format / lint / typecheck 就先跑。
+6. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit.md`。merge / land / ship 是 owner-only：babysit 到 merge-ready 后由 owner 合入。
+7. **合并或放弃后清理。** `oana feature done <slug>`，纪律见 `cleanup.md`。复杂度/根因够深时走 `reflect.md`。
 
 ## 工具边界
 
@@ -19,4 +20,4 @@
 - 编码与验证：在各 repo 的 worktree 内完成。
 - 禁止直接改生产环境配置。
 
-**回复：** slug、各仓 worktree cwd、验收标准、验证证据、未决边界。
+**回复：** slug、各仓 worktree cwd、验收标准、验证证据、风格门、未决边界。

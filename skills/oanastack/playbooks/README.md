@@ -22,7 +22,7 @@
 
 **没有 shipping 卡。** merge / land / ship 是 owner-only：`babysit.md` 推到 merge-ready 后由 owner 合入。只写评论走 `review.md`，不要和 babysit 混用。
 
-共用纪律：禁止直接改生产环境配置；默认 `gh`，不要 Graphite；worktree 只用 `oana`。
+共用纪律：禁止直接改生产环境配置；默认 `gh`，不要 Graphite；worktree 只用 `oana`；代码风格对照 `../references/code-style.md`。
 
 ## 索引
 
@@ -36,4 +36,4 @@
 - `cleanup.md` — 按 `oana feature done` 清理；dirty 需确认。
 - `reflect.md` — 按复杂度/根因门槛沉淀或做架构反思。
 
-配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`。
+配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`、`../references/code-style.md`。

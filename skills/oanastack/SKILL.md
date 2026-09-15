@@ -8,6 +8,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 优先阅读：
 
 - 原则：`references/principles.md`
+- 代码风格：`references/code-style.md`
 - Playbook 路由：`playbooks/README.md`（匹配后把步骤原样抄到 todo）
 - 调研：`playbooks/research.md`
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
