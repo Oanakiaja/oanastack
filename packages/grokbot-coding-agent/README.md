@@ -2,7 +2,7 @@
 
 Product home is **this oanastack tree** (`packages/grokbot-coding-agent/`). Canonical invoke is **`oana grokc …`**. Do not clone, link, or maintain a separate grokc CLI repo. The standalone `grokc` / `grokbot-coding-agent` bins are optional aliases of `oana grokc`.
 
-Grok Bot / agent skill: [`../../skills/grokc-local-coding-agents/SKILL.md`](../../skills/grokc-local-coding-agents/SKILL.md)
+Agent 用法走 oanastack skill（入口 [`../../skills/oanastack/SKILL.md`](../../skills/oanastack/SKILL.md)；工具章 [`../../skills/oanastack/references/grokc.md`](../../skills/oanastack/references/grokc.md)）。
 
 Harness-agnostic TypeScript SDK + CLI for first-class coding-agent sessions.
 
