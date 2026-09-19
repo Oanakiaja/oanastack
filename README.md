@@ -109,7 +109,7 @@ merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由
 
 ## UI / Electron 状态
 
-过程卡：`playbooks/uidesign.md`。完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
+过程卡：`playbooks/uidesign.md`（先风格 / token / 基础组件，再表面；清单 `references/ui-foundation.md`）。完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
 
 ## 原有工具记录
 
