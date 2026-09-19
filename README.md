@@ -106,6 +106,10 @@ Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另�
 
 merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由 owner 合入。
 
+## UI / Electron 状态
+
+完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
+
 ## 原有工具记录
 
 ```bash
