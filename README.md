@@ -6,6 +6,8 @@ Recording reusable scripts, CLI, Skill, Prompt, Plugins.
 
 ## Skill 安装
 
+开发流程只有一套 skill：`skills/oanastack/`。`oana grokc` 是其中的工具章（`skills/oanastack/references/grokc.md`），不要再装第二套 grokc skill。
+
 优先软链到 `~/.agents/skills/oanastack`：
 
 ```bash
@@ -21,11 +23,7 @@ mkdir -p ~/.claude/skills
 ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ```
 
-本地 coding-agent 用法 skill（`oana grokc`）：
-
-```bash
-ln -s "$REPO_ROOT/skills/grokc-local-coding-agents" ~/.agents/skills/grokc-local-coding-agents
-```
+若以前链过 `~/.agents/skills/grokc-local-coding-agents`，删掉那条软链。
 
 ## Feature Session + Worktree 约定
 
@@ -77,7 +75,7 @@ oana grokc approve <sessionId> --request <requestId> --decision accept
 
 ### `oana grokc` 嵌套包
 
-本地 coding-agent CLI **只住在本仓** `packages/grokbot-coding-agent/`（npm 名仍是 `@oana/grokbot-coding-agent`）。需要 Node.js >= 20。不要再 clone / 维护独立的 grokc CLI 仓库；后续工作只在 oanastack。
+本地 coding-agent CLI **只住在本仓** `packages/grokbot-coding-agent/`（npm 名仍是 `@oana/grokbot-coding-agent`）。需要 Node.js >= 20。不要再 clone / 维护独立的 grokc CLI 仓库；后续工作只在 oanastack。Agent 用法走 oanastack skill 的工具章：`skills/oanastack/references/grokc.md`（入口仍是 `skills/oanastack/SKILL.md`）。
 
 ```bash
 cd packages/grokbot-coding-agent
@@ -86,7 +84,7 @@ npm run build
 oana grokc --help
 ```
 
-若 `dist/cli.js` 不存在，`oana grokc` 会在该目录自动 `npm install`（缺 node_modules 时）并 `npm run build`。用法 skill：`skills/grokc-local-coding-agents/SKILL.md`。
+若 `dist/cli.js` 不存在，`oana grokc` 会在该目录自动 `npm install`（缺 node_modules 时）并 `npm run build`。
 
 Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另起一套目录。审批默认 pending，转给人工后再 `oana grokc approve`；只有用户明确要求时才用 `--auto-approve`。
 
