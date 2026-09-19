@@ -106,6 +106,10 @@ Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另�
 
 merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由 owner 合入。
 
+## UI / Electron 状态
+
+选型与边界：`skills/oanastack/references/ui-state.md`。谁拥有事实、怎么订、何时 Effect；桌面端 main 是权威。
+
 ## 原有工具记录
 
 ```bash
