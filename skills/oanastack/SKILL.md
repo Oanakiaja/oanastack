@@ -25,6 +25,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - CI 分诊：`playbooks/cicd.md`
 - 清理 worktree：`playbooks/cleanup.md`
 - 沉淀 / 架构反思：`playbooks/reflect.md`（`references/reflect.md`）
+- 文档 / PR / commit 正文：`references/technical-writing.md`
 
 多仓 feature 推荐先用 `oana` CLI 创建/清理 worktree，再把 session cwd 指向对应 worktree。长 coding session 在该 worktree 内用 `oana grokc`（skill：`../grokc-local-coding-agents/SKILL.md`）；不要另起一套 worktree 平面。grokc 的产品入口只在本仓（`packages/grokbot-coding-agent/` + `oana grokc`），不要指向独立 grokc CLI 仓库。
 
