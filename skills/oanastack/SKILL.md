@@ -13,7 +13,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
 - 长 coding session（`oana grokc`）：`../grokc-local-coding-agents/SKILL.md`
 - 功能开发参考：`references/feature.md`
-- UI 状态（React + Electron）：`references/ui-state.md`
+- UI 状态系统（React + Electron）：`references/ui-state.md`
 - 缺陷修复：`playbooks/bugfix.md`（骨干：`references/bug-fix.md`）
 - 验证：`playbooks/test.md`
 - 看 diff / 写评论：`playbooks/review.md`

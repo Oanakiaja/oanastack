@@ -108,7 +108,7 @@ merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由
 
 ## UI / Electron 状态
 
-选型与边界：`skills/oanastack/references/ui-state.md`。谁拥有事实、怎么订、何时 Effect；桌面端 main 是权威。
+完整系统：`skills/oanastack/references/ui-state.md`。数据源 → 建模 → 渲染判断 → 组件用法；静态 oxlint + 运行时 react-scan。桌面端 main 是权威。
 
 ## 原有工具记录
 
