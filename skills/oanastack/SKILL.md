@@ -1,6 +1,6 @@
 ---
 name: oanastack
-description: oanastack 协作规则与常见工作流（调研、开 feature、修 bug、验证、review、盯 PR/CI、清理 worktree、按门槛复盘）
+description: oanastack 协作规则与常见工作流（调研、开 feature、UI 设计、修 bug、验证、review、盯 PR/CI、清理 worktree、按门槛复盘）
 ---
 
 # oanastack Skill
@@ -13,6 +13,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
 - 长 coding session（`oana grokc`）：`../grokc-local-coding-agents/SKILL.md`
 - 功能开发参考：`references/feature.md`
+- UI 设计：`playbooks/uidesign.md`（foundation：`references/ui-foundation.md`）
 - UI 状态（数据源 / 建模 / Electron）：`references/ui-state.md`
 - UI oxlint 循环（模板）：`references/ui-state-oxlint.md`（`references/templates/oxlintrc.react.json`）
 - UI React Doctor（Agent 可脚本循环）：`references/ui-state-react-doctor.md`
