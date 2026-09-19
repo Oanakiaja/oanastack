@@ -4,7 +4,7 @@
 
 先分类再写 hook。不要先 `useEffect` + `useState` 再倒推 owner。
 
-配套循环：`ui-state-oxlint.md`（静态）→ `ui-state-react-scan.md`（运行时）→ `ui-state-testing.md`（组件 / e2e）。验证顺序见 testing 卡。
+配套循环：`ui-state-oxlint.md`（静态，模板在 `templates/`）→ `ui-state-react-doctor.md`（Agent scan/fix/rescan）→ `ui-state-react-scan.md`（浏览器高亮）→ `ui-state-testing.md`（组件 / e2e）。pstack 没有 oxlint / react-scan 配置。验证顺序见 testing 卡。
 
 ## 硬规则
 
@@ -231,6 +231,7 @@ rg -n "from ['\"]electron-store['\"]|window\\.[A-Za-z]+Bridge" packages apps
 ## 参考
 
 - [React for Systems Engineers](https://tj-zhang.com/blog/react-for-systems-engineers/)
-- oxlint：`ui-state-oxlint.md`
-- react-scan：`ui-state-react-scan.md`
+- oxlint 模板：`ui-state-oxlint.md` / `templates/oxlintrc.react.json`
+- React Doctor（Agent）：`ui-state-react-doctor.md`
+- react-scan（运行时）：`ui-state-react-scan.md`
 - 验证分层：`ui-state-testing.md`

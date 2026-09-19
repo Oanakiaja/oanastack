@@ -13,12 +13,13 @@
 
 默认 Agent 顺序：
 
-1. oxlint React 规则（`ui-state-oxlint.md`）
+1. oxlint React 规则（`ui-state-oxlint.md`，模板在 `templates/`）
 2. ui-state 静态门（整店订户 / 字面量 selector / 禁 import）
-3. 碰到的 unit / contract
-4. 受影响 UI 的 feature / 组件 e2e
-5. 动到 shell / 契约再跑产品本地 e2e
-6. 活 e2e **只在用户批准目标之后**
+3. React Doctor `--json` scan/fix/rescan（`ui-state-react-doctor.md`）
+4. 碰到的 unit / contract
+5. 受影响 UI 的 feature / 组件 e2e；浏览器热点再走 `ui-state-react-scan.md`
+6. 动到 shell / 契约再跑产品本地 e2e
+7. 活 e2e **只在用户批准目标之后**
 
 ## 组件 / feature harness
 
@@ -54,8 +55,10 @@ mount(<SharedWorkbench host={host} />, { strictMode: true })
 ```md
 - [ ] `pnpm lint:react`
 - [ ] ui-state 静态门（若有）
+- [ ] React Doctor `--json` 初扫 / 修复 / rescan（schemaVersion 3）
 - [ ] 碰到的 unit / contract
 - [ ] 受影响 case：`FEATURE_E2E_CASES=...` 组件 / feature harness
+- [ ] 运行时仍卡：react-scan 浏览器环
 - [ ] 动到共享 shell / 契约：本地产品 e2e（Web + Electron）
 - [ ] 活 e2e：已获批准的目标；账本脱敏；用完清理
 ```

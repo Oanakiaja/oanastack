@@ -1,12 +1,20 @@
-# UI oxlint：配置与修复循环
+# UI oxlint：模板与修复循环
 
-静态抓 hooks / 派生 state / render 期 setState。跑在 react-scan 之前。规则 ID 以 [Oxlint rules](https://oxc.rs/docs/guide/usage/linter/rules.html) 和本机 `oxlint --help` 为准，**不要编名字**（虚构 ID 可能被静默忽略）。
+静态抓 hooks / 派生 state / render 期 setState。Agent 可脚本的 scan/fix/rescan 走 **React Doctor CLI**（`ui-state-react-doctor.md`）；react-scan 只负责浏览器里高亮（`ui-state-react-scan.md`）。
 
-下面 JSON 与五条规则已在 **oxlint 1.83.0** 上对过：都能报真实文件。`react/rules-of-hooks`、`react/exhaustive-deps` 输出前缀是 `react-hooks(...)`，配置仍写 `react/...`。
+**pstack 没有** oxlint / react-scan / React Doctor 配置。从本仓模板拷，不要去 pstack 找。
 
-## 推荐 `.oxlintrc.json`
+规则 ID 以 [Oxlint rules](https://oxc.rs/docs/guide/usage/linter/rules.html)、本机 `oxlint --help`、以及 `templates/` 里写明的为准。**不要编名字**（虚构 ID 可能被静默忽略）。五条 `react/*` 已在 **oxlint 1.83.0** 对过真实文件。`react/rules-of-hooks`、`react/exhaustive-deps` 输出前缀是 `react-hooks(...)`，配置仍写 `react/...`。
 
-这是 **React 专项** 配置：`plugins` 只开 `react`，`correctness` 先关上，再点名五条。给 `lint:react` 用；全仓通用 lint 若还要 eslint / unicorn / oxc，另写一份或 `overrides`，不要默默覆盖默认插件集。
+## 拷模板
+
+起步（React 专项：`plugins` 只开 `react`，`correctness` 关上再点名五条）：
+
+```bash
+cp skills/oanastack/references/templates/oxlintrc.react.json .oxlintrc.json
+```
+
+完整 JSON 见 `templates/oxlintrc.react.json`：
 
 ```json
 {
@@ -23,27 +31,23 @@
 }
 ```
 
+这是给 `lint:react` 用的专项 config。全仓通用 lint 若还要 eslint / unicorn / oxc，另写一份或 `overrides`，不要默默覆盖默认插件集。
+
+仓准备好再换 `templates/oxlintrc.react-extended.json`（加 `react-perf` + `oxlint-plugin-react-doctor` 的 `no-fetch-in-effect` / `no-derived-state`）。先 `pnpm add -D oxlint-plugin-react-doctor`，规则页核对后再开。不要在模板之外发明 ID。
+
 ```json
 {
   "scripts": {
-    "lint:react": "oxlint packages/*/src apps/*/src"
+    "lint:react": "oxlint",
+    "lint:react:fix": "oxlint --fix"
+  },
+  "devDependencies": {
+    "oxlint": "^1.81.0"
   }
 }
 ```
 
-CLI 等价探测：
-
-```bash
-oxlint --react-plugin \
-  --deny react/rules-of-hooks \
-  --deny react/exhaustive-deps \
-  --deny react/set-state-in-effect \
-  --deny react/no-deriving-state-in-effects \
-  --deny react/set-state-in-render \
-  packages apps
-```
-
-可选下一步：仓准备好再加 `--react-perf-plugin`（`jsx-no-new-*-as-prop` 等）。加之前用 `oxlint --help` 和规则页核对 ID，不要凭记忆发明。
+路径按产品仓改，例如 `oxlint packages/*/src apps/*/src`。
 
 ## 修复原则
 
@@ -52,20 +56,21 @@ oxlint --react-plugin \
 - 异步读按 request id 建钥；abort / 忽略过期；重试 = 新 request。
 - 稳定回调：满依赖 `useCallback`。Effect 里只对外的 handler：有 `useEffectEvent` 就用。
 - Effect 只留：订阅、网络、DOM、动画、iframe / Blob URL + cleanup。
-- 极少 `oxlint-disable-next-line react/set-state-in-effect`，必须一行理由（测量 / 滚动高亮、Blob URL 生命周期、iframe keepalive、采纳外部路由）。**禁止**blanket disable `exhaustive-deps`。新例外要证明 render / 事件表达不了。
+- 极少 `oxlint-disable-next-line react/set-state-in-effect`，必须一行理由。**禁止** blanket disable `exhaustive-deps`。
 
-## Agent 循环（抄到 todo）
+## Agent oxlint 循环（抄到 todo）
 
-1. `pnpm lint:react`（或仓库等价 make / 脚本）
-2. 按规则分组，不要一条条跳着改
-3. 先修 owner / 派生（见 `ui-state.md`）；disable 是最后手段，且带理由
-4. 再跑到干净
-5. 若仓里有 ui-state 静态门（整店订户 / 字面量 selector / 禁 import），一并跑
-6. 目标交互再走 `ui-state-react-scan.md`；有行为风险走 `ui-state-testing.md`
+1. `pnpm lint:react`
+2. 按规则分组；先修 owner / 派生（`ui-state.md`）
+3. `set-state-in-effect` 的 disable 只能单行且带理由
+4. 再跑到干净（可跟 `pnpm lint:react:fix`，剩下的手修）
+5. 有 ui-state 静态门就一起跑
+6. 编码 Agent 接着走 React Doctor scan/fix/rescan（`ui-state-react-doctor.md`）；浏览器热点走 `ui-state-react-scan.md`
 
 ```md
-- [ ] `pnpm lint:react` 红的按规则分组
-- [ ] owner / 派生修完，不编规则 ID
+- [ ] 已拷 `templates/oxlintrc.react.json`（或仓内等价）
+- [ ] `pnpm lint:react` 按规则分组
+- [ ] owner / 派生先修；无编造 ID
 - [ ] 无理由 disable；无 blanket exhaustive-deps
 - [ ] 静态门（若有）+ lint 全绿
 ```
