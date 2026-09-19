@@ -96,6 +96,7 @@ Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另�
 
 - 调研：`playbooks/research.md`
 - 开 feature / 多仓：`playbooks/feat.md`
+- UI 设计：`playbooks/uidesign.md`
 - 修 bug：`playbooks/bugfix.md`
 - 验证：`playbooks/test.md`
 - 看 diff：`playbooks/review.md`
@@ -108,7 +109,7 @@ merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由
 
 ## UI / Electron 状态
 
-完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
+过程卡：`playbooks/uidesign.md`。完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
 
 ## 原有工具记录
 
