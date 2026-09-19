@@ -110,6 +110,10 @@ merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由
 
 完整系统：`skills/oanastack/references/ui-state.md`。oxlint 模板 `references/templates/oxlintrc.react.json`（pstack 无此配置）；Agent 循环走 React Doctor，运行时高亮走 react-scan。桌面端 Main 是权威。
 
+## 技术写作
+
+文档 / PR / commit 正文：`skills/oanastack/references/technical-writing.md`（中文薄卡，不是 pstack 全文镜像）。
+
 ## 原有工具记录
 
 ```bash
