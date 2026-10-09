@@ -27,6 +27,12 @@ ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ln -s "$REPO_ROOT/skills/grokc-local-coding-agents" ~/.agents/skills/grokc-local-coding-agents
 ```
 
+云端 Grok Bot 经 herdr 驱动本机 Codex：
+
+```bash
+ln -s "$REPO_ROOT/skills/herdr-grokbot" ~/.agents/skills/herdr-grokbot
+```
+
 ## Agent Readiness Report
 
 `skills/agent-readiness-report/` 提供独立的仓库评估流程，借鉴
