@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Readiness Report"
+  short_description: "Evidence-based repository readiness review across eight pillars"
+  default_prompt: "Use $agent-readiness-report to evaluate this repository and prioritize evidence-backed improvements."

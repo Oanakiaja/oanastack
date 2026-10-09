@@ -10,6 +10,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - 原则：`references/principles.md`
 - Playbook 路由：`playbooks/README.md`（匹配后把步骤原样抄到 todo）
 - 调研：`playbooks/research.md`
+- Agent readiness 评估（`/agent-readiness-report`）：`../agent-readiness-report/SKILL.md`（独立通用量表，只评估，不自动修复）
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
 - 长 coding session（`oana grokc`）：`../grokc-local-coding-agents/SKILL.md`
 - 功能开发参考：`references/feature.md`
