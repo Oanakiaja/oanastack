@@ -18,7 +18,7 @@
   - `oana feature paths <slug>`
   - `oana feature done <slug>`
   - `oana grokc launch|reply|get|list|watch|dump|cancel|archive|rename|approve …`
-- 不要用 grokc 再造一套 worktree 目录；Worktrunk / `oana feature` 仍是唯一隔离平面。细则见 `../../grokc-local-coding-agents/SKILL.md`。
+- 不要用 grokc 再造一套 worktree 目录；Worktrunk / `oana feature` 仍是唯一隔离平面。细则见 `grokc.md`。
 - grokc 只在 oanastack：`oana grokc` / `packages/grokbot-coding-agent/`。不要把独立 grokc CLI 仓库当产品入口。
 
 ## 4) 清理
