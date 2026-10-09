@@ -36,4 +36,4 @@
 - `cleanup.md` — 按 `oana feature done` 清理；dirty 需确认。
 - `reflect.md` — 按复杂度/根因门槛沉淀或做架构反思。
 
-配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`。
+配套参考卡：`../references/ci-classify.md`、`../references/feature-session.md`、`../references/bug-fix.md`、`../references/reflect.md`、`../references/technical-writing.md`。
