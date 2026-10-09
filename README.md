@@ -27,6 +27,34 @@ ln -s "$REPO_ROOT/skills/oanastack" ~/.claude/skills/oanastack
 ln -s "$REPO_ROOT/skills/grokc-local-coding-agents" ~/.agents/skills/grokc-local-coding-agents
 ```
 
+## Agent Readiness Report
+
+`skills/agent-readiness-report/` 提供独立的仓库评估流程，借鉴
+[Factory 的 Agent Readiness 文章](https://factory.com/news/agent-readiness)，
+使用 oanastack 自己的八维度、五级量表；结果不是 Factory 官方评分。
+适用于不同语言、托管平台和开源或私有仓库。默认本地检查，不接入 Factory；
+宿主 Agent 的模型服务仍遵循其自身的数据策略。
+
+安装到 Codex 的技能发现目录：
+
+```bash
+ln -s "$REPO_ROOT/skills/agent-readiness-report" ~/.agents/skills/agent-readiness-report
+```
+
+在 Codex 中用 `$agent-readiness-report`，或让已有 `$oanastack` 路由此评估。
+Claude Code 的 `/agent-readiness-report` 需要同时安装 skill 和命令：
+
+```bash
+mkdir -p ~/.claude/skills ~/.claude/commands
+ln -s "$REPO_ROOT/skills/agent-readiness-report" ~/.claude/skills/agent-readiness-report
+ln -s "$REPO_ROOT/~/.claude/commands/agent-readiness-report.md" ~/.claude/commands/agent-readiness-report.md
+```
+
+已有同名文件时先检查，不覆盖。重开会话后可执行
+`/agent-readiness-report` 或 `/agent-readiness-report <repository-path>`。
+报告区分通过、失败、未知、阻塞和不适用，每项附证据与改进建议。
+默认在会话中返回报告；私有项目的报告和源码不应提交到本仓。
+
 ## Feature Session + Worktree 约定
 
 - 一个 feature 对应一个 agent/Codex 线程（命名建议：`repo + feature`）。
