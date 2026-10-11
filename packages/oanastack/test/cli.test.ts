@@ -26,6 +26,8 @@ describe("cli", () => {
     expect(help.stdout).toContain("oanastack");
     expect(help.stdout).toContain("serve");
     expect(help.stdout).toContain("project");
+    expect(help.stdout).toContain("repo");
+    expect(help.stdout).toContain("feature");
     const version = await capture(["--version"]);
     expect(version.code).toBe(0);
     expect(version.stdout).toContain("@oana/oanastack 0.1.0");

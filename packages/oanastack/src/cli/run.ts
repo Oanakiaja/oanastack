@@ -1,6 +1,7 @@
+import path from "node:path";
 import { renderUsage, runCommand, type CommandDef } from "citty";
 import { exitCodeFor, StoreError } from "../errors.js";
-import { resolveDbPath } from "../paths.js";
+import { resolveLocation } from "../paths.js";
 import { CLI_BIN_NAME, PACKAGE_NAME, PACKAGE_VERSION } from "../version.js";
 import { main } from "./commands.js";
 import { plain, setIo, type CliIo } from "./io.js";
@@ -14,8 +15,12 @@ export interface RunCliOptions {
 
 export async function runCli(argv: string[], options: RunCliOptions = {}): Promise<number> {
   const env = options.env ?? process.env;
+  const location = resolveLocation(env);
+  const dbPath = options.dbPath ? path.resolve(options.dbPath) : location.dbPath;
   const io: CliIo = {
-    dbPath: options.dbPath ?? resolveDbPath(env),
+    dbPath,
+    root: options.dbPath ? path.dirname(dbPath) : location.root,
+    env,
     stdout: options.stdout ?? ((line) => console.log(line)),
     stderr: options.stderr ?? ((line) => console.error(line)),
   };

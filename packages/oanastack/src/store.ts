@@ -1,15 +1,24 @@
+import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { integer, openDatabase, rowId, rows, text, textOrNull } from "./db.js";
+import { integer, integerOrNull, openDatabase, rowId, rows, text, textOrNull } from "./db.js";
 import { StoreError } from "./errors.js";
 import {
+  FEATURE_STATUSES,
   RESULT_STATUSES,
+  type AddFeatureInput,
   type AddProjectInput,
+  type AddRepoInput,
   type AddTargetInput,
   type Completion,
   type CompletionInput,
+  type Feature,
+  type FeatureRepoLink,
+  type FeatureStatus,
+  type LinkTargetInput,
   type Overview,
   type Progress,
   type Project,
+  type Repo,
   type ResultInput,
   type ResultStatus,
   type Target,
@@ -29,6 +38,9 @@ const LIMITS = {
   herdrStatus: 80,
   herdrResult: 8_000,
   body: 20_000,
+  goal: 4_000,
+  test: 1_000,
+  pr: 1_000,
 } as const;
 
 interface ProjectRow {
@@ -43,6 +55,7 @@ interface ProjectRow {
 interface TargetRow {
   id: number;
   projectId: number;
+  featureId: number | null;
   title: string;
   status: TargetStatus;
   summary: string | null;
@@ -54,13 +67,37 @@ interface TargetRow {
   updatedAt: string;
 }
 
+interface FeatureRow {
+  id: number;
+  projectId: number;
+  slug: string;
+  status: FeatureStatus;
+  goal: string | null;
+  workspacePath: string | null;
+  archivePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FeatureRepoRow {
+  id: number;
+  featureId: number;
+  repoId: number;
+  baseBranch: string;
+  branch: string;
+  worktreePath: string | null;
+  prUrl: string | null;
+}
+
 export class Store {
   readonly path: string;
+  readonly root: string;
   private readonly db: DatabaseSync;
 
-  constructor(db: DatabaseSync, dbPath: string) {
+  constructor(db: DatabaseSync, dbPath: string, root?: string) {
     this.db = db;
     this.path = dbPath;
+    this.root = root ?? (dbPath === ":memory:" ? "" : path.dirname(dbPath));
   }
 
   close(): void {
@@ -85,21 +122,203 @@ export class Store {
     }
   }
 
+  addRepo(input: AddRepoInput): Repo {
+    const name = requireSlug(input.name);
+    const repoPath = requireText(input.path, "path", LIMITS.path);
+    if (!path.isAbsolute(repoPath)) throw new StoreError("repo path must be absolute", "invalid");
+    const testCommand = optionalText(input.testCommand, "test", LIMITS.test);
+    const now = iso();
+    try {
+      const info = this.db
+        .prepare("INSERT INTO repos (name, path, test_command, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+        .run(name, repoPath, testCommand, now, now);
+      const repo = this.repoRows().find((item) => item.id === rowId(info.lastInsertRowid));
+      if (!repo) throw new StoreError("repo not found after insert", "not_found");
+      return repo;
+    } catch (error) {
+      if (isUnique(error)) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("repos.path")) throw new StoreError(`repo path already registered: ${repoPath}`, "conflict");
+        throw new StoreError(`repo already exists: ${name}`, "conflict");
+      }
+      throw error;
+    }
+  }
+
+  listRepos(): Repo[] {
+    return this.repoRows();
+  }
+
+  getRepo(name: string): Repo {
+    const normalized = requireSlug(name);
+    const repo = this.repoRows().find((item) => item.name === normalized);
+    if (!repo) throw new StoreError(`repo not found: ${normalized}`, "not_found");
+    return repo;
+  }
+
+  addFeature(input: AddFeatureInput): Feature {
+    const project = this.projectBySlug(input.project);
+    const slug = requireSlug(input.slug);
+    const goal = optionalText(input.goal, "goal", LIMITS.goal);
+    const workspacePath = requireText(input.workspacePath, "workspace", LIMITS.path);
+    if (input.repos.length === 0) throw new StoreError("feature needs at least one repo", "invalid");
+    const now = iso();
+    const seen = new Set<number>();
+    const links = input.repos.map((item) => {
+      const repo = this.getRepo(item.repo);
+      if (seen.has(repo.id)) throw new StoreError(`repo listed twice: ${repo.name}`, "invalid");
+      seen.add(repo.id);
+      return {
+        repo,
+        baseBranch: requireText(item.baseBranch, "base", LIMITS.branch),
+        branch: requireText(item.branch, "branch", LIMITS.branch),
+        worktreePath: requireText(item.worktreePath, "worktree", LIMITS.path),
+      };
+    });
+    this.db.exec("BEGIN");
+    let featureId = 0;
+    try {
+      const info = this.db
+        .prepare(
+          `INSERT INTO features (project_id, slug, status, goal, workspace_path, created_at, updated_at)
+           VALUES (?, ?, 'open', ?, ?, ?, ?)`,
+        )
+        .run(project.id, slug, goal, workspacePath, now, now);
+      featureId = rowId(info.lastInsertRowid);
+      const insertLink = this.db.prepare(
+        `INSERT INTO feature_repos (feature_id, repo_id, base_branch, branch, worktree_path)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      for (const link of links) {
+        insertLink.run(featureId, link.repo.id, link.baseBranch, link.branch, link.worktreePath);
+      }
+      this.touchProject(project.id, now);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      try {
+        this.db.exec("ROLLBACK");
+      } catch {
+        // Already committed or already rolled back.
+      }
+      if (isUnique(error)) {
+        throw new StoreError(`feature already exists: ${project.slug}/${slug}`, "conflict");
+      }
+      throw error;
+    }
+    return this.requireFeature(featureId);
+  }
+
+  deleteFeature(id: number): void {
+    this.db.prepare("DELETE FROM features WHERE id = ?").run(id);
+  }
+
+  listFeatures(projectSlug?: string): Feature[] {
+    if (projectSlug !== undefined) return this.getProject(projectSlug).features;
+    return this.group(this.projectRows()).flatMap((project) => project.features);
+  }
+
+  getFeature(projectSlug: string, featureSlug: string): Feature {
+    const project = this.getProject(projectSlug);
+    const slug = requireSlug(featureSlug);
+    const feature = project.features.find((item) => item.slug === slug);
+    if (!feature) throw new StoreError(`feature not found: ${project.slug}/${slug}`, "not_found");
+    return feature;
+  }
+
+  findFeature(slug: string, projectSlug?: string | null): Feature {
+    if (projectSlug) return this.getFeature(projectSlug, slug);
+    const normalized = requireSlug(slug);
+    const matches = this.listFeatures().filter((feature) => feature.slug === normalized);
+    if (matches.length === 0) throw new StoreError(`feature not found: ${normalized}`, "not_found");
+    if (matches.length > 1) {
+      throw new StoreError(`feature ${normalized} is in multiple projects; pass --project`, "invalid");
+    }
+    const found = matches[0];
+    if (!found) throw new StoreError(`feature not found: ${normalized}`, "not_found");
+    return found;
+  }
+
+  getFeatureById(id: number): Feature {
+    return this.requireFeature(id);
+  }
+
+  setFeatureStatus(id: number, status: FeatureStatus): Feature {
+    requireFeatureStatus(status);
+    const now = iso();
+    const info = this.db.prepare("UPDATE features SET status = ?, updated_at = ? WHERE id = ?").run(status, now, id);
+    if (changeCount(info.changes) === 0) throw new StoreError(`feature not found: ${id}`, "not_found");
+    const feature = this.requireFeature(id);
+    this.touchProject(feature.projectId, now);
+    return this.requireFeature(id);
+  }
+
+  setFeatureRepoPr(featureId: number, repoId: number, prUrl: string): void {
+    const url = requireText(prUrl, "pr", LIMITS.pr);
+    const now = iso();
+    const info = this.db
+      .prepare("UPDATE feature_repos SET pr_url = ? WHERE feature_id = ? AND repo_id = ?")
+      .run(url, featureId, repoId);
+    if (changeCount(info.changes) === 0) throw new StoreError("feature repo not found", "not_found");
+    this.db.prepare("UPDATE features SET updated_at = ? WHERE id = ?").run(now, featureId);
+  }
+
+  closeFeatureRecord(id: number, status: "done" | "abandoned", archivePath: string): Feature {
+    const archive = requireText(archivePath, "archive", LIMITS.path);
+    const now = iso();
+    const info = this.db
+      .prepare("UPDATE features SET status = ?, workspace_path = NULL, archive_path = ?, updated_at = ? WHERE id = ?")
+      .run(status, archive, now, id);
+    if (changeCount(info.changes) === 0) throw new StoreError(`feature not found: ${id}`, "not_found");
+    this.db.prepare("UPDATE feature_repos SET worktree_path = NULL WHERE feature_id = ?").run(id);
+    const feature = this.requireFeature(id);
+    this.touchProject(feature.projectId, now);
+    return this.requireFeature(id);
+  }
+
   addTarget(input: AddTargetInput): Target {
     const project = this.projectBySlug(input.project);
     const title = requireText(input.title, "title", LIMITS.title);
-    const worktreePath = optionalText(input.worktreePath, "worktree", LIMITS.path);
-    const branch = optionalText(input.branch, "branch", LIMITS.branch);
+    let worktreePath = optionalText(input.worktreePath, "worktree", LIMITS.path);
+    let branch = optionalText(input.branch, "branch", LIMITS.branch);
+    const linked = this.resolveFeatureLink(project, input.feature, input.repo);
+    if (linked.link) {
+      if (worktreePath === null) worktreePath = linked.link.worktreePath;
+      if (branch === null) branch = linked.link.branch;
+    }
     const now = iso();
     const info = this.db
       .prepare(
         `INSERT INTO targets (
-          project_id, title, status, worktree_path, branch, created_at, updated_at
-        ) VALUES (?, ?, 'open', ?, ?, ?, ?)`,
+          project_id, feature_id, title, status, worktree_path, branch, created_at, updated_at
+        ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)`,
       )
-      .run(project.id, title, worktreePath, branch, now, now);
+      .run(project.id, linked.featureId, title, worktreePath, branch, now, now);
     this.touchProject(project.id, now);
     return this.requireTarget(rowId(info.lastInsertRowid));
+  }
+
+  linkTarget(id: number, input: LinkTargetInput): Target {
+    const current = this.targetRow(id);
+    if (!current) throw new StoreError(`target not found: ${id}`, "not_found");
+    const project = this.projectRows().find((item) => item.id === current.projectId);
+    if (!project) throw new StoreError(`project not found: ${current.projectId}`, "not_found");
+    if (input.project && requireSlug(input.project) !== project.slug) {
+      throw new StoreError(`target ${id} is in ${project.slug}, not ${input.project}`, "invalid");
+    }
+    const linked = this.resolveFeatureLink(project, input.feature, input.repo);
+    if (linked.featureId === null) throw new StoreError("feature is required", "invalid");
+    let worktreePath = current.worktreePath;
+    let branch = current.branch;
+    if (linked.link) {
+      if (worktreePath === null) worktreePath = linked.link.worktreePath;
+      if (branch === null) branch = linked.link.branch;
+    }
+    const now = iso();
+    this.db
+      .prepare("UPDATE targets SET feature_id = ?, worktree_path = ?, branch = ?, updated_at = ? WHERE id = ?")
+      .run(linked.featureId, worktreePath, branch, now, id);
+    this.touchProject(project.id, now);
+    return this.requireTarget(id);
   }
 
   setResult(id: number, input: ResultInput): Target {
@@ -149,7 +368,7 @@ export class Store {
       .run(targetId, changed, why, verified, risks, review, now);
     this.touchProject(target.projectId, now);
     const completion = this.completionById(rowId(info.lastInsertRowid));
-    if (!completion) throw new StoreError(`completion not found after insert`, "not_found");
+    if (!completion) throw new StoreError("completion not found after insert", "not_found");
     return completion;
   }
 
@@ -180,9 +399,33 @@ export class Store {
     const projects = this.listProjects();
     return {
       dbPath: this.path,
+      root: this.root,
+      repos: this.listRepos(),
       projects,
       progress: progressOf(projects.flatMap((project) => project.targets.map((target) => target.status))),
     };
+  }
+
+  private resolveFeatureLink(
+    project: ProjectRow,
+    featureSlug: string | null | undefined,
+    repoName: string | null | undefined,
+  ): { featureId: number | null; link: FeatureRepoLink | undefined } {
+    if (!featureSlug) {
+      if (repoName) throw new StoreError("--repo requires --feature", "invalid");
+      return { featureId: null, link: undefined };
+    }
+    const feature = this.findFeature(featureSlug, project.slug);
+    if (feature.projectId !== project.id) {
+      throw new StoreError(`feature ${feature.slug} is not in ${project.slug}`, "invalid");
+    }
+    if (repoName) {
+      const name = requireSlug(repoName);
+      const link = feature.repos.find((item) => item.name === name);
+      if (!link) throw new StoreError(`repo is not on this feature: ${name}`, "not_found");
+      return { featureId: feature.id, link };
+    }
+    return { featureId: feature.id, link: feature.repos.length === 1 ? feature.repos[0] : undefined };
   }
 
   private requireProject(id: number): Project {
@@ -195,6 +438,12 @@ export class Store {
     const target = this.listTargets().find((item) => item.id === id);
     if (!target) throw new StoreError(`target not found: ${id}`, "not_found");
     return target;
+  }
+
+  private requireFeature(id: number): Feature {
+    const feature = this.listFeatures().find((item) => item.id === id);
+    if (!feature) throw new StoreError(`feature not found: ${id}`, "not_found");
+    return feature;
   }
 
   private projectBySlug(slug: string): ProjectRow {
@@ -219,10 +468,48 @@ export class Store {
     }));
   }
 
+  private repoRows(): Repo[] {
+    return rows(this.db.prepare("SELECT * FROM repos ORDER BY name ASC, id ASC")).map((row) => ({
+      id: integer(row, "id"),
+      name: text(row, "name"),
+      path: text(row, "path"),
+      testCommand: textOrNull(row, "test_command"),
+      createdAt: text(row, "created_at"),
+      updatedAt: text(row, "updated_at"),
+    }));
+  }
+
+  private featureRows(): FeatureRow[] {
+    return rows(this.db.prepare("SELECT * FROM features ORDER BY id ASC")).map((row) => ({
+      id: integer(row, "id"),
+      projectId: integer(row, "project_id"),
+      slug: text(row, "slug"),
+      status: asFeatureStatus(text(row, "status")),
+      goal: textOrNull(row, "goal"),
+      workspacePath: textOrNull(row, "workspace_path"),
+      archivePath: textOrNull(row, "archive_path"),
+      createdAt: text(row, "created_at"),
+      updatedAt: text(row, "updated_at"),
+    }));
+  }
+
+  private featureRepoRows(): FeatureRepoRow[] {
+    return rows(this.db.prepare("SELECT * FROM feature_repos ORDER BY id ASC")).map((row) => ({
+      id: integer(row, "id"),
+      featureId: integer(row, "feature_id"),
+      repoId: integer(row, "repo_id"),
+      baseBranch: text(row, "base_branch"),
+      branch: text(row, "branch"),
+      worktreePath: textOrNull(row, "worktree_path"),
+      prUrl: textOrNull(row, "pr_url"),
+    }));
+  }
+
   private targetRows(): TargetRow[] {
     return rows(this.db.prepare("SELECT * FROM targets ORDER BY id ASC")).map((row) => ({
       id: integer(row, "id"),
       projectId: integer(row, "project_id"),
+      featureId: integerOrNull(row, "feature_id"),
       title: text(row, "title"),
       status: asStatus(text(row, "status")),
       summary: textOrNull(row, "summary"),
@@ -259,25 +546,55 @@ export class Store {
   private group(projects: ProjectRow[]): Project[] {
     const targets = this.targetRows();
     const completions = this.completionRows();
+    const features = this.featureRows();
+    const links = this.featureRepoRows();
+    const repos = this.repoRows();
+    const featureSlugById = new Map(features.map((feature) => [feature.id, feature.slug]));
     return projects.map((project) => {
       const projectTargets = targets
         .filter((target) => target.projectId === project.id)
         .map((target) => ({
           ...target,
           projectSlug: project.slug,
+          featureSlug: target.featureId === null ? null : (featureSlugById.get(target.featureId) ?? null),
           completions: completions.filter((completion) => completion.targetId === target.id),
+        }));
+      const projectFeatures = features
+        .filter((feature) => feature.projectId === project.id)
+        .map((feature) => ({
+          ...feature,
+          projectSlug: project.slug,
+          repos: links
+            .filter((link) => link.featureId === feature.id)
+            .map((link) => {
+              const repo = repos.find((item) => item.id === link.repoId);
+              if (!repo) throw new StoreError(`repo missing for feature ${feature.slug}`, "invalid");
+              return {
+                id: link.id,
+                repoId: repo.id,
+                name: repo.name,
+                path: repo.path,
+                testCommand: repo.testCommand,
+                baseBranch: link.baseBranch,
+                branch: link.branch,
+                worktreePath: link.worktreePath,
+                prUrl: link.prUrl,
+              };
+            }),
+          targets: projectTargets.filter((target) => target.featureId === feature.id),
         }));
       return {
         ...project,
         progress: progressOf(projectTargets.map((target) => target.status)),
+        features: projectFeatures,
         targets: projectTargets,
       };
     });
   }
 }
 
-export function openStore(dbPath: string): Store {
-  return new Store(openDatabase(dbPath), dbPath);
+export function openStore(dbPath: string, root?: string): Store {
+  return new Store(openDatabase(dbPath), dbPath, root);
 }
 
 export function progressOf(statuses: TargetStatus[]): Progress {
@@ -294,6 +611,10 @@ export function progressOf(statuses: TargetStatus[]): Progress {
   }
   progress.ratio = progress.total === 0 ? 0 : Math.round((progress.success / progress.total) * 10000) / 10000;
   return progress;
+}
+
+export function assertSlug(slug: string): string {
+  return requireSlug(slug);
 }
 
 function requireSlug(slug: string): string {
@@ -331,9 +652,19 @@ function requireResultStatus(status: string): ResultStatus {
   throw new StoreError("status must be success, failed, or rejected", "invalid");
 }
 
+function requireFeatureStatus(status: string): FeatureStatus {
+  if ((FEATURE_STATUSES as readonly string[]).includes(status)) return status as FeatureStatus;
+  throw new StoreError("feature status must be open, review, done, or abandoned", "invalid");
+}
+
 function asStatus(value: string): TargetStatus {
   if (value === "open" || value === "success" || value === "failed" || value === "rejected") return value;
   throw new StoreError(`unknown target status: ${value}`, "invalid");
+}
+
+function asFeatureStatus(value: string): FeatureStatus {
+  if (value === "open" || value === "review" || value === "done" || value === "abandoned") return value;
+  throw new StoreError(`unknown feature status: ${value}`, "invalid");
 }
 
 function iso(): string {
@@ -342,4 +673,8 @@ function iso(): string {
 
 function isUnique(error: unknown): boolean {
   return error instanceof Error && error.message.includes("UNIQUE constraint failed");
+}
+
+function changeCount(changes: number | bigint): number {
+  return typeof changes === "bigint" ? Number(changes) : changes;
 }

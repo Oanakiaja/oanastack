@@ -1,10 +1,12 @@
 import { defineCommand } from "citty";
 import { StoreError } from "../errors.js";
-import { openStore } from "../store.js";
+import { openStore, type Store } from "../store.js";
 import { startServer } from "../server.js";
 import { resolveWebRoot } from "../api.js";
 import type { CompletionInput, Project, Target } from "../types.js";
+import { syncFeatureContext } from "../workspace.js";
 import { CLI_BIN_NAME, DEFAULT_PORT, PACKAGE_VERSION } from "../version.js";
+import { configCommand, featureCommand, repoCommand } from "./workspace-commands.js";
 import { formatProjectBlock, formatProjectLine, formatTargetLine } from "./format.js";
 import { emit, getIo } from "./io.js";
 
@@ -13,13 +15,18 @@ const json = {
   description: "Print one JSON object",
 } as const;
 
-function using<T>(fn: (store: ReturnType<typeof openStore>) => T): T {
-  const store = openStore(getIo().dbPath);
+function using<T>(fn: (store: Store) => T): T {
+  const io = getIo();
+  const store = openStore(io.dbPath, io.root);
   try {
     return fn(store);
   } finally {
     store.close();
   }
+}
+
+function refresh(store: Store, featureId: number | null): void {
+  if (featureId !== null) syncFeatureContext(store, featureId);
 }
 
 function requireId(raw: string): number {
@@ -44,6 +51,8 @@ function targetBrief(target: Target) {
     title: target.title,
     status: target.status,
     summary: target.summary,
+    featureId: target.featureId,
+    feature: target.featureSlug,
     worktreePath: target.worktreePath,
     branch: target.branch,
     herdrStatus: target.herdrStatus,
@@ -121,17 +130,23 @@ const targetAdd = defineCommand({
     title: { type: "positional", description: "Goal title", required: true },
     wt: { type: "string", description: "Worktree path" },
     branch: { type: "string", description: "Branch" },
+    feature: { type: "string", description: "Feature slug" },
+    repo: { type: "string", description: "Repo name when the feature spans several" },
     json,
   },
   run({ args }) {
-    const target = using((store) =>
-      store.addTarget({
+    const target = using((store) => {
+      const created = store.addTarget({
         project: args.project,
         title: args.title,
         worktreePath: args.wt,
         branch: args.branch,
-      }),
-    );
+        feature: args.feature,
+        repo: args.repo,
+      });
+      refresh(store, created.featureId);
+      return created;
+    });
     emit(args.json === true, targetBrief(target), `target ${target.id} ${target.projectSlug} open ${target.title}`);
   },
 });
@@ -184,17 +199,46 @@ const targetResult = defineCommand({
     json,
   },
   run({ args }) {
-    const target = using((store) =>
-      store.setResult(requireId(args.id), {
+    const target = using((store) => {
+      const updated = store.setResult(requireId(args.id), {
         status: args.status as "success" | "failed" | "rejected",
         summary: args.summary,
         worktreePath: args.wt,
         branch: args.branch,
         herdrStatus: args["herdr-status"],
         herdrResult: args.herdr,
-      }),
-    );
+      });
+      refresh(store, updated.featureId);
+      return updated;
+    });
     emit(args.json === true, targetBrief(target), `target ${target.id} ${target.status}`);
+  },
+});
+
+const targetLink = defineCommand({
+  meta: {
+    name: `${CLI_BIN_NAME} target link`,
+    description: "Attach an existing target to a feature",
+  },
+  args: {
+    id: { type: "positional", description: "Target id", required: true },
+    feature: { type: "string", description: "Feature slug", required: true },
+    project: { type: "string", description: "Project slug when the feature name is shared" },
+    repo: { type: "string", description: "Repo name when the feature spans several" },
+    json,
+  },
+  run({ args }) {
+    if (!args.feature) throw new StoreError("--feature is required", "invalid");
+    const target = using((store) => {
+      const linked = store.linkTarget(requireId(args.id), {
+        feature: args.feature,
+        project: args.project,
+        repo: args.repo,
+      });
+      refresh(store, linked.featureId);
+      return linked;
+    });
+    emit(args.json === true, targetBrief(target), `target ${target.id} feature ${target.featureSlug ?? ""}`);
   },
 });
 
@@ -209,6 +253,7 @@ const target = defineCommand({
     ls: targetLs,
     get: targetGet,
     result: targetResult,
+    link: targetLink,
   },
 });
 
@@ -229,7 +274,11 @@ const done = defineCommand({
   },
   run({ args }) {
     const input = completionFromArgs(args);
-    const completion = using((store) => store.addCompletion(requireId(args.id), input));
+    const completion = using((store) => {
+      const created = store.addCompletion(requireId(args.id), input);
+      refresh(store, store.getTarget(created.targetId).featureId);
+      return created;
+    });
     emit(args.json === true, completion, `completion ${completion.id} target ${completion.targetId}`);
   },
 });
@@ -259,7 +308,7 @@ const serve = defineCommand({
     json,
   },
   async run({ args }) {
-    const store = openStore(getIo().dbPath);
+    const store = openStore(getIo().dbPath, getIo().root);
     try {
       const port = Number(args.port);
       const running = await startServer({
@@ -286,7 +335,10 @@ export const main = defineCommand({
   subCommands: {
     serve,
     show,
+    config: configCommand,
+    repo: repoCommand,
     project,
+    feature: featureCommand,
     target,
     done,
   },

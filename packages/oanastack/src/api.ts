@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { StoreError } from "./errors.js";
 import type { Store } from "./store.js";
 import type { ResultStatus } from "./types.js";
+import { browseDirectories, closeFeature, createFeature, mergeFeature, registerRepo, repoCatalog, syncFeatureContext } from "./workspace.js";
 
 export function resolveWebRoot(moduleUrl: string = import.meta.url): string | null {
   const dir = path.dirname(fileURLToPath(moduleUrl));
@@ -16,9 +17,10 @@ export function resolveWebRoot(moduleUrl: string = import.meta.url): string | nu
   return null;
 }
 
-export function createApp(store: Store, options?: { webRoot?: string | null }): Hono {
+export function createApp(store: Store, options?: { webRoot?: string | null; env?: NodeJS.ProcessEnv }): Hono {
   const app = new Hono();
   const webRoot = options?.webRoot ?? null;
+  const env = options?.env ?? process.env;
 
   app.onError((err, c) => {
     if (err instanceof StoreError) {
@@ -31,6 +33,17 @@ export function createApp(store: Store, options?: { webRoot?: string | null }): 
 
   app.get("/api/health", (c) => c.json({ ok: true }));
   app.get("/api/overview", (c) => c.json(store.overview()));
+  app.get("/api/browse", (c) => c.json(browseDirectories(c.req.query("path") ?? "")));
+  app.get("/api/repos", (c) => c.json(repoCatalog(store)));
+  app.post("/api/repos", async (c) => {
+    const body = await readJson(c);
+    const repo = registerRepo(store, {
+      name: requireString(body, "name"),
+      path: requireString(body, "path"),
+      testCommand: optionalString(body, "testCommand") ?? optionalString(body, "test"),
+    });
+    return c.json(repo, 201);
+  });
   app.get("/api/projects", (c) => c.json(store.listProjects()));
   app.post("/api/projects", async (c) => {
     const body = await readJson(c);
@@ -42,6 +55,35 @@ export function createApp(store: Store, options?: { webRoot?: string | null }): 
     return c.json(project, 201);
   });
   app.get("/api/projects/:slug", (c) => c.json(store.getProject(c.req.param("slug"))));
+  app.post("/api/projects/:slug/features", async (c) => {
+    const body = await readJson(c);
+    const feature = createFeature(store, store.root, {
+      project: c.req.param("slug"),
+      slug: requireString(body, "slug"),
+      goal: optionalString(body, "goal"),
+      repos: requireRepoSpecs(body),
+    });
+    return c.json(feature, 201);
+  });
+  app.post("/api/projects/:slug/features/:feature/merge", async (c) => {
+    const body = await readJson(c);
+    const feature = mergeFeature(store, {
+      project: c.req.param("slug"),
+      feature: c.req.param("feature"),
+      local: optionalBoolean(body, "local"),
+      env,
+    });
+    return c.json(feature);
+  });
+  app.post("/api/projects/:slug/features/:feature/close", async (c) => {
+    const body = await readJson(c);
+    const feature = closeFeature(store, store.root, {
+      project: c.req.param("slug"),
+      feature: c.req.param("feature"),
+      abandon: optionalBoolean(body, "abandon"),
+    });
+    return c.json(feature);
+  });
   app.post("/api/projects/:slug/targets", async (c) => {
     const body = await readJson(c);
     const target = store.addTarget({
@@ -49,7 +91,10 @@ export function createApp(store: Store, options?: { webRoot?: string | null }): 
       title: requireString(body, "title"),
       worktreePath: optionalString(body, "worktreePath"),
       branch: optionalString(body, "branch"),
+      feature: optionalString(body, "feature"),
+      repo: optionalString(body, "repo"),
     });
+    if (target.featureId !== null) syncFeatureContext(store, target.featureId);
     return c.json(target, 201);
   });
   app.get("/api/targets/:id", (c) => c.json(store.getTarget(idParam(c.req.param("id")))));
@@ -63,6 +108,7 @@ export function createApp(store: Store, options?: { webRoot?: string | null }): 
       herdrStatus: optionalString(body, "herdrStatus"),
       herdrResult: optionalString(body, "herdrResult"),
     });
+    if (target.featureId !== null) syncFeatureContext(store, target.featureId);
     return c.json(target);
   });
   app.post("/api/targets/:id/completions", async (c) => {
@@ -74,7 +120,19 @@ export function createApp(store: Store, options?: { webRoot?: string | null }): 
       risks: optionalString(body, "risks"),
       review: optionalString(body, "review") ?? optionalString(body, "check"),
     });
+    const target = store.getTarget(completion.targetId);
+    if (target.featureId !== null) syncFeatureContext(store, target.featureId);
     return c.json(completion, 201);
+  });
+  app.post("/api/targets/:id/feature", async (c) => {
+    const body = await readJson(c);
+    const target = store.linkTarget(idParam(c.req.param("id")), {
+      feature: requireString(body, "feature"),
+      project: optionalString(body, "project"),
+      repo: optionalString(body, "repo"),
+    });
+    if (target.featureId !== null) syncFeatureContext(store, target.featureId);
+    return c.json(target);
   });
 
   if (webRoot) {
@@ -123,4 +181,29 @@ function optionalString(body: Record<string, unknown>, key: string): string | un
 function idParam(raw: string): number {
   if (!/^[1-9]\d*$/.test(raw)) throw new StoreError("id must be a positive integer", "invalid");
   return Number(raw);
+}
+
+function optionalBoolean(body: Record<string, unknown>, key: string): boolean {
+  if (!(key in body) || body[key] === undefined || body[key] === null) return false;
+  if (typeof body[key] !== "boolean") throw new StoreError(`${key} must be a boolean`, "invalid");
+  return body[key] === true;
+}
+
+function requireRepoSpecs(body: Record<string, unknown>): Array<{ name: string; base: string }> {
+  const repos = body.repos;
+  if (!Array.isArray(repos) || repos.length === 0) {
+    throw new StoreError("repos must be a non-empty array", "invalid");
+  }
+  return repos.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new StoreError(`repos[${index}] must be an object`, "invalid");
+    }
+    const record = item as Record<string, unknown>;
+    const name = record.name;
+    const base = record.base ?? record.baseBranch;
+    if (typeof name !== "string" || typeof base !== "string") {
+      throw new StoreError(`repos[${index}] needs name and base`, "invalid");
+    }
+    return { name, base };
+  });
 }

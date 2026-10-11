@@ -1,6 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { StoreError } from "../src/errors.js";
 import { openStore, progressOf } from "../src/store.js";
@@ -80,5 +81,59 @@ describe("store", () => {
     expect(() => store.addCompletion(ok.id, { changed: " ", why: "y", verified: "v" })).toThrow(/changed is required/);
     expect(() => store.getProject("missing")).toThrow(/not found/);
     store.close();
+  });
+
+  it("upgrades a v1 database and keeps existing targets", () => {
+    const dbPath = tempDb();
+    const db = new DatabaseSync(dbPath);
+    db.exec(`
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE targets (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        summary TEXT,
+        worktree_path TEXT,
+        branch TEXT,
+        herdr_status TEXT,
+        herdr_result TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE completions (
+        id INTEGER PRIMARY KEY,
+        target_id INTEGER NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+        changed TEXT NOT NULL,
+        why TEXT NOT NULL,
+        verified TEXT NOT NULL,
+        risks TEXT,
+        review TEXT,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO projects (slug, name, created_at, updated_at) VALUES ('billing-api', 'Billing API', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      INSERT INTO targets (project_id, title, created_at, updated_at) VALUES (1, 'Idempotent charge keys', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      PRAGMA user_version = 1;
+    `);
+    db.close();
+
+    const store = openStore(dbPath);
+    expect(store.getProject("billing-api").targets[0]).toMatchObject({ title: "Idempotent charge keys", featureId: null });
+    const repo = store.addRepo({ name: "billing", path: "/tmp/billing-repo" });
+    expect(repo.path).toBe("/tmp/billing-repo");
+    expect(store.overview().repos).toHaveLength(1);
+    store.close();
+
+    const again = new DatabaseSync(dbPath);
+    const version = again.prepare("PRAGMA user_version").get() as { user_version: number };
+    expect(version.user_version).toBe(2);
+    again.close();
   });
 });

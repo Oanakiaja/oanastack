@@ -2,6 +2,8 @@ export interface CliIo {
   stdout: (line: string) => void;
   stderr: (line: string) => void;
   dbPath: string;
+  root: string;
+  env: NodeJS.ProcessEnv;
 }
 
 let current: CliIo | undefined;

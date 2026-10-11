@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLOutputValue, type StatementSync } from "node:sqlite";
 
-const SCHEMA = `
+const SCHEMA_V2 = `
 CREATE TABLE projects (
   id INTEGER PRIMARY KEY,
   slug TEXT NOT NULL UNIQUE,
@@ -15,6 +15,7 @@ CREATE TABLE projects (
 CREATE TABLE targets (
   id INTEGER PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  feature_id INTEGER,
   title TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'success', 'failed', 'rejected')),
   summary TEXT,
@@ -37,8 +38,85 @@ CREATE TABLE completions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE repos (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  path TEXT NOT NULL UNIQUE,
+  test_command TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE features (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'review', 'done', 'abandoned')),
+  goal TEXT,
+  workspace_path TEXT,
+  archive_path TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(project_id, slug)
+);
+
+CREATE TABLE feature_repos (
+  id INTEGER PRIMARY KEY,
+  feature_id INTEGER NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  base_branch TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  worktree_path TEXT,
+  pr_url TEXT,
+  UNIQUE(feature_id, repo_id)
+);
+
 CREATE INDEX targets_project_idx ON targets(project_id);
+CREATE INDEX targets_feature_idx ON targets(feature_id);
 CREATE INDEX completions_target_idx ON completions(target_id);
+CREATE INDEX features_project_idx ON features(project_id);
+CREATE INDEX feature_repos_feature_idx ON feature_repos(feature_id);
+`;
+
+const SCHEMA_V1_TO_V2 = `
+ALTER TABLE targets ADD COLUMN feature_id INTEGER;
+CREATE INDEX targets_feature_idx ON targets(feature_id);
+
+CREATE TABLE repos (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  path TEXT NOT NULL UNIQUE,
+  test_command TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE features (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'review', 'done', 'abandoned')),
+  goal TEXT,
+  workspace_path TEXT,
+  archive_path TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(project_id, slug)
+);
+
+CREATE TABLE feature_repos (
+  id INTEGER PRIMARY KEY,
+  feature_id INTEGER NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  base_branch TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  worktree_path TEXT,
+  pr_url TEXT,
+  UNIQUE(feature_id, repo_id)
+);
+
+CREATE INDEX features_project_idx ON features(project_id);
+CREATE INDEX feature_repos_feature_idx ON feature_repos(feature_id);
 `;
 
 export function openDatabase(dbPath: string): DatabaseSync {
@@ -58,11 +136,11 @@ export function openDatabase(dbPath: string): DatabaseSync {
 function migrate(db: DatabaseSync): void {
   const row = db.prepare("PRAGMA user_version").get();
   const version = row && typeof row.user_version === "number" ? row.user_version : 0;
-  if (version >= 1) return;
+  if (version >= 2) return;
   db.exec("BEGIN");
   try {
-    db.exec(SCHEMA);
-    db.exec("PRAGMA user_version = 1;");
+    db.exec(version < 1 ? SCHEMA_V2 : SCHEMA_V1_TO_V2);
+    db.exec("PRAGMA user_version = 2;");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -84,6 +162,12 @@ export function integer(row: Record<string, SQLOutputValue>, key: string): numbe
     throw new Error(`expected integer column ${key}`);
   }
   return value;
+}
+
+export function integerOrNull(row: Record<string, SQLOutputValue>, key: string): number | null {
+  const value = row[key];
+  if (value === null || value === undefined) return null;
+  return integer(row, key);
 }
 
 export function textOrNull(row: Record<string, SQLOutputValue>, key: string): string | null {

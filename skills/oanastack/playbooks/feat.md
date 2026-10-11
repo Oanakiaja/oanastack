@@ -16,6 +16,7 @@
 ## 工具边界
 
 - 创建 / 列出 / 取路径 / 清理：`oana`（底层 `wt`）。不要引入 Graphite 或额外编排层。
+- 看板里的多仓 feature 是另一套目录：`oanastack repo add` 按绝对路径登记仓库，`oanastack feature new` 在 `~/.oanastack/projects/<project>/features/<feature>/<repo>/` 建 worktree。这和 `oana feature` / `wt` 不是同一个平面。
 - 长 session 编码：`oana grokc`（在 feature worktree cwd 内）。`oana grokc worktree` 仍走 `wt`，不是第二套隔离平面。不要把独立 grokc CLI 仓库当产品入口。
 - 编码与验证：在各 repo 的 worktree 内完成。
 - 禁止直接改生产环境配置。

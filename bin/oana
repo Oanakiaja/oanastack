@@ -368,12 +368,15 @@ Usage:
   oana feature done <slug> [--force]
   oana grokc <action> [args...]
   oana agent <action> [args...]
-  oanastack serve|project|target|done|show
+  oanastack serve|config|repo|project|feature|target|done|show
 
 Progress dashboard (bin/oanastack, Node.js >= 22.13):
   oanastack serve
+  oanastack config root [path]
+  oanastack repo add|ls
   oanastack project add|ls|get
-  oanastack target add|ls|get|result
+  oanastack feature new|ls|status|merge|close
+  oanastack target add|ls|get|result|link
   oanastack done <target-id> --changed --why --verified
   Skill: skills/oanastack-progress/SKILL.md
 

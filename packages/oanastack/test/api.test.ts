@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -60,6 +60,23 @@ describe("api", () => {
     expect(missing.status).toBe(404);
     const page = await app.request("/");
     expect(page.status).toBe(503);
+    store.close();
+  });
+
+  it("lists a directory for the repo picker", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "oanastack-browse-"));
+    mkdirSync(path.join(root, "billing"));
+    mkdirSync(path.join(root, ".git"));
+    const store = openStore(tempDb());
+    const app = createApp(store, { webRoot: null });
+    const listed = await app.request(`/api/browse?path=${encodeURIComponent(root)}`);
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as { path: string; entries: Array<{ name: string }>; parent: string | null };
+    expect(body.path).toBe(root);
+    expect(body.entries.map((entry) => entry.name)).toEqual(["billing"]);
+    expect(body.parent).toBeTruthy();
+    const relative = await app.request("/api/browse?path=relative");
+    expect(relative.status).toBe(400);
     store.close();
   });
 
