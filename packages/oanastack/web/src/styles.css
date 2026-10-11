@@ -90,7 +90,7 @@ h2 {
   overflow: hidden;
 }
 
-.seg { display: block; height: 100%; }
+.seg { display: block; height: 100%; flex: none; }
 .seg.success { background: var(--success); }
 .seg.failed { background: var(--failed); }
 .seg.rejected { background: #8d867c; }
