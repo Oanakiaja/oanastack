@@ -2,7 +2,7 @@
 
 Local progress dashboard for agent-driven work. Canonical command is **`oanastack`** (`bin/oanastack` in this repo). Skill: [`../../skills/oanastack-progress/SKILL.md`](../../skills/oanastack-progress/SKILL.md).
 
-Agents register repos by absolute path, open a feature workspace with one git worktree per repo, and log targets plus completion records. `oanastack serve` opens a localhost page so a person can pick a repo root, choose repos and a base branch per repo, then review what changed.
+Agents register repos by absolute path, open a feature workspace with one git worktree per repo, and log targets plus completion records. `oanastack serve` opens a localhost page: projects, each worktree's outcome, and a project rollup, plus a worktree map with a live git distance and an in-page side-by-side diff against the base branch.
 
 - Package: `@oana/oanastack` (private, not published)
 - Node.js: >= 22.13 (`node:sqlite`, no native addon)

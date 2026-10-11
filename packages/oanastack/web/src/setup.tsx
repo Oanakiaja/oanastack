@@ -45,25 +45,27 @@ export function ProjectForm({ onDone, onError }: { onDone: (slug: string) => voi
       setName("");
       onDone(created.slug);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "could not add project");
+      onError(err instanceof Error ? err.message : "无法添加项目");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form className="stack-form" onSubmit={(event) => void submit(event)}>
-      <h2 className="section-label">New project</h2>
-      <label>
-        Slug
-        <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="billing-api" required />
-      </label>
-      <label>
-        Name
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Billing API" />
-      </label>
-      <button className="chip" type="submit" disabled={busy}>Add project</button>
-    </form>
+    <details className="stack-form">
+      <summary>新建项目</summary>
+      <form onSubmit={(event) => void submit(event)}>
+        <label>
+          slug
+          <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="billing-api" required />
+        </label>
+        <label>
+          名称
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Billing API" />
+        </label>
+        <button className="chip" type="submit" disabled={busy}>添加项目</button>
+      </form>
+    </details>
   );
 }
 
@@ -83,7 +85,7 @@ export function RepoForm({ onDone, onError }: { onDone: () => void; onError: (me
       if (!response.ok) throw new Error(await errorText(response));
       setBrowse((await response.json()) as BrowseResult);
     } catch (err) {
-      setBrowseError(err instanceof Error ? err.message : "could not list that directory");
+      setBrowseError(err instanceof Error ? err.message : "无法列出该目录");
     }
   }
 
@@ -103,55 +105,57 @@ export function RepoForm({ onDone, onError }: { onDone: () => void; onError: (me
       setBrowse(null);
       onDone();
     } catch (err) {
-      onError(err instanceof Error ? err.message : "could not register repo");
+      onError(err instanceof Error ? err.message : "无法登记 repo");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form className="stack-form" onSubmit={(event) => void submit(event)}>
-      <h2 className="section-label">Register repo</h2>
-      <label>
-        Name
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="billing" required />
-      </label>
-      <label>
-        Absolute path
-        <span className="path-row">
-          <input
-            value={repoPath}
-            onChange={(event) => setRepoPath(event.target.value)}
-            placeholder="/home/you/src/billing"
-            required
-          />
-          <button className="chip" type="button" onClick={() => void openBrowse(repoPath)}>Browse</button>
-        </span>
-      </label>
-      {browse ? (
-        <div className="picker">
-          <p className="mono picker-path">{browse.path}</p>
-          <button className="chip" type="button" onClick={() => { setRepoPath(browse.path); setBrowse(null); }}>
-            Use this directory
-          </button>
-          {browse.parent ? (
-            <button type="button" onClick={() => void openBrowse(browse.parent ?? "")}>Up</button>
-          ) : null}
-          {browse.entries.map((entry) => (
-            <button key={entry.path} type="button" onClick={() => void openBrowse(entry.path)}>
-              {entry.name}
+    <details className="stack-form">
+      <summary>登记 repo</summary>
+      <form onSubmit={(event) => void submit(event)}>
+        <label>
+          名称
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="billing" required />
+        </label>
+        <label>
+          绝对路径
+          <span className="path-row">
+            <input
+              value={repoPath}
+              onChange={(event) => setRepoPath(event.target.value)}
+              placeholder="/home/you/src/billing"
+              required
+            />
+            <button className="chip" type="button" onClick={() => void openBrowse(repoPath)}>浏览</button>
+          </span>
+        </label>
+        {browse ? (
+          <div className="picker">
+            <p className="mono picker-path">{browse.path}</p>
+            <button className="chip" type="button" onClick={() => { setRepoPath(browse.path); setBrowse(null); }}>
+              使用此目录
             </button>
-          ))}
-          {browse.truncated ? <p className="muted">Showing the first 200 directories.</p> : null}
-        </div>
-      ) : null}
-      {browseError ? <p className="muted">{browseError}</p> : null}
-      <label>
-        Test command
-        <input value={testCommand} onChange={(event) => setTestCommand(event.target.value)} placeholder="npm test" />
-      </label>
-      <button className="chip" type="submit" disabled={busy}>Register</button>
-    </form>
+            {browse.parent ? (
+              <button type="button" onClick={() => void openBrowse(browse.parent ?? "")}>上级</button>
+            ) : null}
+            {browse.entries.map((entry) => (
+              <button key={entry.path} type="button" onClick={() => void openBrowse(entry.path)}>
+                {entry.name}
+              </button>
+            ))}
+            {browse.truncated ? <p className="muted">只显示前 200 个目录。</p> : null}
+          </div>
+        ) : null}
+        {browseError ? <p className="muted">{browseError}</p> : null}
+        <label>
+          test 命令
+          <input value={testCommand} onChange={(event) => setTestCommand(event.target.value)} placeholder="npm test" />
+        </label>
+        <button className="chip" type="submit" disabled={busy}>登记</button>
+      </form>
+    </details>
   );
 }
 
@@ -192,7 +196,7 @@ export function FeatureForm({
         });
       })
       .catch((err: unknown) => {
-        if (!cancelled) onError(err instanceof Error ? err.message : "could not load repos");
+        if (!cancelled) onError(err instanceof Error ? err.message : "无法读取 repo");
       });
     return () => {
       cancelled = true;
@@ -205,7 +209,7 @@ export function FeatureForm({
       .filter((repo) => picked[repo.name])
       .map((repo) => ({ name: repo.name, base: bases[repo.name] || repo.defaultBranch }));
     if (repos.length === 0) {
-      onError("Choose at least one repo and a base branch");
+      onError("至少选择一个 repo，并填写 base branch");
       return;
     }
     setBusy(true);
@@ -222,28 +226,25 @@ export function FeatureForm({
       setPicked({});
       onDone(created.slug);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "could not create feature");
+      onError(err instanceof Error ? err.message : "无法创建 feature");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <details
-      className="stack-form"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-    >
-      <summary>New feature</summary>
+    <details className="stack-form" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>新建 feature</summary>
       <form onSubmit={(event) => void submit(event)}>
         <label>
-          Slug
+          slug
           <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="charge-keys" required />
         </label>
         <label>
-          Goal
+          目标
           <input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="One charge per checkout" />
         </label>
-        {catalog.length === 0 ? <p className="muted">Register a repo before creating a feature.</p> : null}
+        {catalog.length === 0 ? <p className="muted">先登记 repo，再创建 feature。</p> : null}
         {catalog.map((repo) => (
           <div key={repo.id} className="repo-choice">
             <label className="check">
@@ -255,7 +256,7 @@ export function FeatureForm({
               {repo.name}
             </label>
             <label>
-              Base branch
+              base branch
               <input
                 value={bases[repo.name] ?? repo.defaultBranch}
                 list={`bases-${repo.id}`}
@@ -269,7 +270,7 @@ export function FeatureForm({
             </label>
           </div>
         ))}
-        <button className="chip" type="submit" disabled={busy || !project}>Create feature</button>
+        <button className="chip" type="submit" disabled={busy || !project}>创建 feature</button>
       </form>
     </details>
   );

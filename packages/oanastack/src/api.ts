@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { StoreError } from "./errors.js";
+import { diffWorktree, measureWorktree } from "./git-stats.js";
 import type { Store } from "./store.js";
 import type { ResultStatus } from "./types.js";
 import { browseDirectories, closeFeature, createFeature, mergeFeature, registerRepo, repoCatalog, syncFeatureContext } from "./workspace.js";
@@ -55,6 +56,50 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
     return c.json(project, 201);
   });
   app.get("/api/projects/:slug", (c) => c.json(store.getProject(c.req.param("slug"))));
+  app.get("/api/projects/:slug/worktrees", (c) => {
+    const project = store.getProject(c.req.param("slug"));
+    const worktrees = project.features.flatMap((feature) =>
+      feature.repos.map((repo) => ({
+        featureId: feature.id,
+        featureSlug: feature.slug,
+        featureStatus: feature.status,
+        goal: feature.goal,
+        repoName: repo.name,
+        repoPath: repo.path,
+        baseBranch: repo.baseBranch,
+        branch: repo.branch,
+        worktreePath: repo.worktreePath,
+        prUrl: repo.prUrl,
+        ...measureWorktree({
+          repoPath: repo.path,
+          worktreePath: repo.worktreePath,
+          baseBranch: repo.baseBranch,
+          branch: repo.branch,
+        }),
+      })),
+    );
+    return c.json({ project: project.slug, worktrees });
+  });
+  app.get("/api/projects/:slug/diff", (c) => {
+    const featureSlug = c.req.query("feature");
+    const repoName = c.req.query("repo");
+    if (!featureSlug || !repoName) throw new StoreError("feature and repo are required", "invalid");
+    const feature = store.getFeature(c.req.param("slug"), featureSlug);
+    const repo = feature.repos.find((item) => item.name === repoName);
+    if (!repo) throw new StoreError(`repo not on feature: ${repoName}`, "not_found");
+    const file = c.req.query("file");
+    return c.json(
+      diffWorktree(
+        {
+          repoPath: repo.path,
+          worktreePath: repo.worktreePath,
+          baseBranch: repo.baseBranch,
+          branch: repo.branch,
+        },
+        file || undefined,
+      ),
+    );
+  });
   app.post("/api/projects/:slug/features", async (c) => {
     const body = await readJson(c);
     const feature = createFeature(store, store.root, {
