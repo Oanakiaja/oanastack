@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence.schema.json",
+  "title": "oanastack Evidence and playbook conclusion",
+  "description": "Design contract for playbook conclusions and the Evidence records they cite. Not implemented. Adapted from REA's Evidence record (MIT); see references/architecture.md.",
+  "$defs": {
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "EvidenceId": {
+      "type": "string",
+      "pattern": "^ev_[a-f0-9]{64}$"
+    },
+    "ConclusionId": {
+      "type": "string",
+      "pattern": "^cn_[a-f0-9]{64}$"
+    },
+    "UnknownId": {
+      "type": "string",
+      "pattern": "^unk-[a-z0-9-]{8,64}$"
+    },
+    "JsonValue": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/JsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/JsonValue" } }
+      ]
+    },
+    "Provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] }
+      }
+    },
+    "SubjectKind": {
+      "enum": [
+        "pull_request",
+        "commit",
+        "ci_check",
+        "test_output",
+        "diff",
+        "worktree",
+        "repository",
+        "file",
+        "dashboard_record",
+        "command"
+      ]
+    },
+    "Subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "locator", "digest"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/SubjectKind" },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display only. Excluded from the evidence id projection."
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable lookup string (URL, git oid, or path). Excluded from the evidence id projection because digest already commits to it."
+        },
+        "digest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "hex"],
+          "properties": {
+            "algorithm": { "const": "sha256" },
+            "hex": { "$ref": "#/$defs/Sha256Hex" }
+          },
+          "description": "SHA-256 of the canonical subject identity, not a display string. See architecture.md for which fields are hashed."
+        },
+        "git_oid": {
+          "type": ["string", "null"],
+          "description": "Observed git object id when the subject is a commit or a PR head. Not assumed to be SHA-256."
+        }
+      }
+    },
+    "Location": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "url", "number", "repository"],
+          "properties": {
+            "kind": { "const": "pull_request" },
+            "url": { "type": "string", "minLength": 1 },
+            "number": { "type": "integer", "minimum": 1 },
+            "repository": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repository", "oid"],
+          "properties": {
+            "kind": { "const": "commit" },
+            "repository": { "type": "string", "minLength": 1 },
+            "oid": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "url"],
+          "properties": {
+            "kind": { "const": "ci_check" },
+            "name": { "type": "string", "minLength": 1 },
+            "url": { "type": ["string", "null"] },
+            "run_id": { "type": ["string", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path"],
+          "properties": {
+            "kind": { "const": "file" },
+            "path": { "type": "string", "minLength": 1 },
+            "line": { "type": ["integer", "null"], "minimum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "argv"],
+          "properties": {
+            "kind": { "const": "command" },
+            "argv": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            },
+            "exit_code": { "type": ["integer", "null"] },
+            "cwd": { "type": ["string", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "parent_evidence_id", "cursor"],
+          "properties": {
+            "kind": { "const": "log_page" },
+            "parent_evidence_id": { "$ref": "#/$defs/EvidenceId" },
+            "cursor": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "Coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["complete", "partial", "uncovered"],
+          "description": "uncovered means the claim is unknown. It does not mean the thing is absent or failing."
+        },
+        "examined": {
+          "type": "string",
+          "description": "What was actually looked at, in one sentence."
+        }
+      }
+    },
+    "Page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent_evidence_id", "detail", "complete"],
+      "properties": {
+        "parent_evidence_id": { "$ref": "#/$defs/EvidenceId" },
+        "detail": { "enum": ["summary", "page"] },
+        "cursor": { "type": ["string", "null"] },
+        "complete": { "type": "boolean" }
+      },
+      "description": "Retrieval hint for a large result. Excluded from the evidence id projection so a page can cite its own evidence_id. Large logs and diffs stay with the producer."
+    },
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "provider",
+        "subject",
+        "operation",
+        "parameters",
+        "raw_result",
+        "normalized_result",
+        "confidence",
+        "authority",
+        "limitations",
+        "locations",
+        "evidence_links",
+        "coverage"
+      ],
+      "properties": {
+        "evidence_id": { "$ref": "#/$defs/EvidenceId" },
+        "provider": { "$ref": "#/$defs/Provider" },
+        "subject": { "$ref": "#/$defs/Subject" },
+        "operation": { "type": "string", "minLength": 1 },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/JsonValue" }
+        },
+        "raw_result": { "$ref": "#/$defs/JsonValue" },
+        "normalized_result": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/JsonValue" },
+          "description": "Operation payload. Per-operation output schemas arrive with the generated tool catalog. This envelope does not pin them."
+        },
+        "confidence": { "enum": ["observed", "derived", "inferred"] },
+        "authority": {
+          "enum": ["forge", "local_command", "executor", "analyst", "dashboard"]
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "locations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Location" }
+        },
+        "evidence_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceId" }
+        },
+        "coverage": { "$ref": "#/$defs/Coverage" },
+        "page": { "$ref": "#/$defs/Page" }
+      }
+    },
+    "Unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "why_unknown"],
+      "properties": {
+        "id": { "$ref": "#/$defs/UnknownId" },
+        "question": { "type": "string", "minLength": 1 },
+        "why_unknown": { "type": "string", "minLength": 1 },
+        "required_authority": { "type": ["string", "null"] },
+        "evidence_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceId" }
+        }
+      }
+    },
+    "BabysitResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "frontier",
+        "actions",
+        "remaining",
+        "stopped_before_merge"
+      ],
+      "properties": {
+        "mode": { "enum": ["drive", "check", "threads-only"] },
+        "frontier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "number",
+            "url",
+            "forge_mergeable",
+            "head_oid"
+          ],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "number": { "type": "integer", "minimum": 1 },
+            "url": { "type": "string", "minLength": 1 },
+            "forge_mergeable": {
+              "enum": ["mergeable", "blocked", "unknown"],
+              "description": "Use unknown when the forge was not asked or did not answer. Do not treat unknown as blocked."
+            },
+            "head_oid": { "type": ["string", "null"] }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "item", "reason"],
+            "properties": {
+              "kind": { "enum": ["fixed", "rejected", "reported"] },
+              "item": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "evidence_links": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/EvidenceId" }
+              }
+            }
+          }
+        },
+        "remaining": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "stopped_before_merge": {
+          "const": true,
+          "description": "Babysit ends at merge-ready. The owner merges."
+        }
+      }
+    },
+    "ReviewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_aligned", "risks", "test_gaps", "comments", "verdict"],
+      "properties": {
+        "intent_aligned": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "const": "unknown" }
+          ]
+        },
+        "risks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "test_gaps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["body", "nit"],
+            "properties": {
+              "path": { "type": ["string", "null"] },
+              "line": { "type": ["integer", "null"], "minimum": 1 },
+              "body": { "type": "string", "minLength": 1 },
+              "nit": { "type": "boolean" }
+            }
+          }
+        },
+        "verdict": {
+          "enum": [
+            "lgtm",
+            "lgtm_with_reservations",
+            "changes_requested",
+            "unresolved"
+          ]
+        }
+      }
+    },
+    "DeferredResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reply"],
+      "properties": {
+        "kind": { "const": "deferred" },
+        "reply": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Prose reply until a later PR gives this playbook a typed body."
+        }
+      }
+    },
+    "ConclusionBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conclusion_id",
+        "playbook",
+        "question",
+        "status",
+        "summary",
+        "what_was_done",
+        "evidence",
+        "unknowns",
+        "needs_human",
+        "normalized"
+      ],
+      "properties": {
+        "conclusion_id": { "$ref": "#/$defs/ConclusionId" },
+        "playbook": {
+          "enum": [
+            "research",
+            "feat",
+            "bugfix",
+            "test",
+            "review",
+            "babysit",
+            "cicd",
+            "cleanup",
+            "reflect",
+            "readiness"
+          ]
+        },
+        "question": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["answered", "partial", "unresolved"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "what_was_done": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Evidence" }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Unknown" }
+        },
+        "needs_human": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "normalized": true
+      }
+    },
+    "Conclusion": {
+      "allOf": [
+        { "$ref": "#/$defs/ConclusionBase" },
+        {
+          "if": {
+            "properties": { "playbook": { "const": "babysit" } },
+            "required": ["playbook"]
+          },
+          "then": {
+            "properties": { "normalized": { "$ref": "#/$defs/BabysitResult" } }
+          },
+          "else": {
+            "if": {
+              "properties": { "playbook": { "const": "review" } },
+              "required": ["playbook"]
+            },
+            "then": {
+              "properties": { "normalized": { "$ref": "#/$defs/ReviewResult" } }
+            },
+            "else": {
+              "properties": {
+                "normalized": { "$ref": "#/$defs/DeferredResult" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/Evidence" },
+    { "$ref": "#/$defs/Conclusion" }
+  ]
+}
