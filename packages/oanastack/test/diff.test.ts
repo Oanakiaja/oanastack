@@ -39,6 +39,7 @@ describe("worktree diff", () => {
         "-const amount = 1;",
         "+const amount = 2;",
         " return amount;",
+        "",
       ].join("\n"),
     );
     expect(parsed.truncated).toBe(false);

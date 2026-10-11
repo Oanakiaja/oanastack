@@ -177,7 +177,8 @@ export function parseSideBySide(unified: string): { rows: DiffRow[]; truncated: 
       }
       continue;
     }
-    if (!inHunk || line.startsWith("\\")) continue;
+    // A real blank context line is " ". An empty string is the trailing split from a final newline.
+    if (!inHunk || line === "" || line.startsWith("\\")) continue;
     if (line.startsWith("-")) {
       if (adds.length > 0) flush();
       dels.push({ no: leftNo, text: line.slice(1) });
