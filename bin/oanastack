@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PKG_DIR="${REPO_ROOT}/packages/oanastack"
+CLI="${PKG_DIR}/dist/cli.js"
+
+err() { echo "oanastack: $*" >&2; }
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    err "missing command: $1"
+    exit 1
+  fi
+}
+
+ensure_node() {
+  need_cmd node
+  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 13)) { console.error("oanastack: Node.js >= 22.13 required (node:sqlite), current " + process.versions.node); process.exit(1); }'
+}
+
+ensure_cli() {
+  if [ -f "$CLI" ]; then
+    return
+  fi
+  if [ ! -f "$PKG_DIR/package.json" ]; then
+    err "package missing at ${PKG_DIR}"
+    exit 1
+  fi
+  need_cmd npm
+  err "building @oana/oanastack (dist/cli.js missing)…"
+  (
+    cd "$PKG_DIR"
+    if [ ! -d node_modules ]; then
+      npm install
+    fi
+    npm run build
+  )
+  if [ ! -f "$CLI" ]; then
+    err "build did not produce ${CLI}"
+    err "run: (cd ${PKG_DIR} && npm install && npm run build)"
+    exit 1
+  fi
+}
+
+ensure_node
+ensure_cli
+exec node --disable-warning=ExperimentalWarning "$CLI" "$@"

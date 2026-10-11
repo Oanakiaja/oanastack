@@ -1,0 +1,4 @@
+interface:
+  display_name: "oanastack progress"
+  short_description: "用 oanastack CLI 记录 project、target、result 和 completion，供本地看板复查"
+  default_prompt: "使用 $oanastack-progress，用 oanastack CLI --json 记下当前目标、结果和完成记录。"

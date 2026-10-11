@@ -9,7 +9,7 @@
 1. **开 feature session + worktree。** `oana feature start <slug> [repo-alias...]`；用 `oana feature hint <slug>` 取线程名与 cwd。session cwd 必须指向 worktree，禁止在主 checkout 上开发。长 session 在该 cwd 内用 `oana grokc launch|reply|…`（见 `../../grokc-local-coding-agents/SKILL.md`），不要另起 homemade worktree。
 2. **写验收标准与边界。** 可验证、可失败；写清不做什么。
 3. **小步实现。** 优先可验证改动；每步能独立证明。多仓按 alias 在各自 worktree 提交，不串仓污染。
-4. **提交前验证并留下证据。** 目标验证走 `test.md`。「编译过」不是验收。
+4. **提交前验证并留下证据。** 目标验证走 `test.md`。「编译过」不是验收。做完一条可复查的目标时，用 `oanastack target result` 和 `oanastack done` 记下变更、验证、以及用户该看什么（`../../oanastack-progress/SKILL.md`）。
 5. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit.md`。merge / land / ship 是 owner-only：babysit 到 merge-ready 后由 owner 合入。
 6. **合并或放弃后清理。** `oana feature done <slug>`，纪律见 `cleanup.md`。复杂度/根因够深时走 `reflect.md`。
 

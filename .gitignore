@@ -3,3 +3,8 @@ packages/*/node_modules/
 packages/*/dist/
 packages/*/coverage/
 *.tsbuildinfo
+
+# local progress db if someone points OANASTACK_DB at the repo
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

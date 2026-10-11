@@ -122,6 +122,29 @@ oana grokc --help
 
 若 `dist/cli.js` 不存在，`oana grokc` 会在该目录自动 `npm install`（缺 node_modules 时）并 `npm run build`。用法 skill：`skills/grokc-local-coding-agents/SKILL.md`。
 
+## 进度看板
+
+`oanastack` 是本仓的 TypeScript CLI（`packages/oanastack/`），把 agent 的项目、目标、完成记录记到本地 SQLite，并用 localhost 页面供人复查。需要 Node.js >= 22.13。数据库默认 `~/.oanastack/oanastack.sqlite`（`OANASTACK_DB` / `OANASTACK_HOME` 可覆盖）。
+
+```bash
+REPO_ROOT="$HOME/Documents/github/oanastack"
+mkdir -p ~/.local/bin
+ln -s "$REPO_ROOT/bin/oanastack" ~/.local/bin/oanastack
+```
+
+`bin/oanastack` 在 `dist/cli.js` 缺失时会在 `packages/oanastack` 里安装依赖并 build。Agent 写法见 `skills/oanastack-progress/SKILL.md`。日志命令都支持 `--json`。
+
+```bash
+oanastack project add billing-api --name "Billing API" --json
+oanastack target add billing-api "Idempotent charge keys" --branch feature/idempotency --json
+oanastack target result 1 success --summary "one charge" --json
+oanastack done 1 --changed "…" --why "…" --verified "npm test" --check "place the order twice" --json
+oanastack show --json
+oanastack serve   # http://127.0.0.1:4747 ，只绑 localhost
+```
+
+页面从 project 看到 target，再点开 completion：改了什么、为什么、如何验证、风险、用户该看什么。worktree / branch 和 herdr 结果是可选自由文本。`serve` 不需要先跑；CLI 直接写同一个 SQLite 文件，页面会自己刷新。
+
 Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另起一套目录。审批默认 pending，转给人工后再 `oana grokc approve`；只有用户明确要求时才用 `--auto-approve`。
 
 ## Playbooks（借鉴 pstack）

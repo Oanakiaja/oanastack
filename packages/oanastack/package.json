@@ -1,0 +1,42 @@
+{
+  "name": "@oana/oanastack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local progress dashboard for agent-driven work: projects, targets, and completion reviews.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "bin": {
+    "oanastack": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build",
+    "postbuild": "node scripts/ensure-shebang.mjs",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.4",
+    "citty": "^0.2.2",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^8.3.4",
+    "vitest": "^3.0.9"
+  }
+}
