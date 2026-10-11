@@ -45,9 +45,11 @@ a { color: var(--success); }
 code, pre, .mono { font-family: var(--mono); }
 
 .app {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .top {
@@ -154,6 +156,7 @@ h2 {
   display: grid;
   grid-template-columns: 260px minmax(280px, 1fr) minmax(320px, 420px);
   min-height: 0;
+  overflow: hidden;
 }
 
 .pane {
@@ -417,7 +420,8 @@ details.stack-form summary {
 .status.abandoned { background: var(--rejected-soft); color: var(--rejected); }
 
 @media (max-width: 980px) {
-  .top, .workspace { grid-template-columns: 1fr; }
+  .app { height: auto; min-height: 100vh; overflow: visible; }
+  .top, .workspace { grid-template-columns: 1fr; overflow: visible; }
   .top-meta { justify-self: start; text-align: left; }
   .pane { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; }
 }
