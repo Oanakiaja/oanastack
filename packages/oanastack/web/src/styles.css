@@ -268,15 +268,25 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .tree-label { margin: 0; }
 .tree-branch p { margin: 2px 0; }
 
-.dir-tree button { width: 100%; }
-.all-line, .dir-hit, .file-line {
-  display: flex;
+.all-line, .file-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px;
   align-items: baseline;
+  width: 100%;
   padding: 2px 2px;
 }
+.all-line { grid-template-columns: auto minmax(0, 1fr); }
 .dir-line { display: flex; gap: 2px; align-items: baseline; }
-.dir-hit { min-width: 0; }
+.dir-hit {
+  display: grid;
+  grid-template-columns: minmax(2.5em, 1fr) auto;
+  gap: 6px;
+  align-items: baseline;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 2px;
+}
 .twist {
   width: 1.2em;
   flex: none;
