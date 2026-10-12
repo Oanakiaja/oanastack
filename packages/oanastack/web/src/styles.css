@@ -99,7 +99,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 
 .map-page.comparing {
   display: grid;
-  grid-template-columns: 240px 168px minmax(0, 1fr);
+  grid-template-columns: 200px 280px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -118,7 +118,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 
 .pane:last-child { border-right: 0; }
 
-.project-list, .target-list, .plain, .file-list, .repo-mini {
+.project-list, .target-list, .plain, .repo-mini {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -133,7 +133,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
   margin-bottom: 2px;
 }
 
-.project-list button.selected, .file-list button.selected, .tree-branch.open {
+.project-list button.selected, .tree-branch.open, .dir-tree .selected {
   background: var(--soft);
 }
 
@@ -268,16 +268,41 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .tree-label { margin: 0; }
 .tree-branch p { margin: 2px 0; }
 
-.file-list button {
+.dir-tree button { width: 100%; }
+.all-line, .dir-hit, .file-line {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  width: 100%;
-  padding: 4px 4px;
-  margin-bottom: 2px;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 2px;
 }
+.dir-line { display: flex; gap: 2px; align-items: baseline; }
+.dir-hit { min-width: 0; }
+.twist {
+  width: 1.2em;
+  flex: none;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.dir-nest {
+  margin-left: 8px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+.letter { width: 1.2em; flex: none; color: var(--muted); }
+.dir-tree .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dir-tree .muted { margin-left: auto; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
 
 .diff-pane { background: var(--paper); }
+.diff-file { margin-top: 12px; }
+.diff-file h3 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 650;
+  scroll-margin-top: 8px;
+}
 .diff-table { margin-top: 8px; border-top: 1px solid var(--line); }
 
 .diff-row {

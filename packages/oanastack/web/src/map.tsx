@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { filesUnder } from "../../src/diff-tree";
+import { FileTree } from "./file-tree";
 import { mapHash } from "./route";
 
 interface WorktreeRow {
@@ -36,11 +38,23 @@ interface DiffRow {
   right: string | null;
 }
 
+interface DiffSection {
+  path: string;
+  status: string;
+  added: number;
+  removed: number;
+  binary: boolean;
+  truncated: boolean;
+  rows: DiffRow[];
+}
+
 interface DiffPayload {
   base: string;
   head: string;
   dirty: boolean;
   files: DiffFile[];
+  sections: DiffSection[];
+  sectionsTruncated: boolean;
   file: string | null;
   binary: boolean;
   truncated: boolean;
@@ -69,9 +83,9 @@ export function MapPage({
   const [error, setError] = useState<string | null>(null);
   const [diff, setDiff] = useState<DiffPayload | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<{ key: string; path?: string }>({ key: "" });
-  const routeKey = `${project}/${feature ?? ""}/${repo ?? ""}/${refreshKey}`;
-  const file = picked.key === routeKey ? picked.path : undefined;
+  const [activeDir, setActiveDir] = useState<string | null>(null);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const diffPane = useRef<HTMLElement>(null);
   const comparing = Boolean(feature && repo);
 
   useEffect(() => {
@@ -100,8 +114,7 @@ export function MapPage({
       return;
     }
     let cancelled = false;
-    const query = new URLSearchParams({ feature, repo });
-    if (file) query.set("file", file);
+    const query = new URLSearchParams({ feature, repo, all: "1" });
     void fetch(`/api/projects/${encodeURIComponent(project)}/diff?${query.toString()}`)
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorText(response));
@@ -119,7 +132,17 @@ export function MapPage({
     return () => {
       cancelled = true;
     };
-  }, [project, feature, repo, file, refreshKey]);
+  }, [project, feature, repo, refreshKey]);
+
+  useEffect(() => {
+    setActiveDir(null);
+    setActiveFile(null);
+  }, [project, feature, repo, refreshKey]);
+
+  useEffect(() => {
+    if (!activeFile) return;
+    document.getElementById(fileAnchor(activeFile))?.scrollIntoView({ block: "start" });
+  }, [activeFile, activeDir, diff]);
 
   const groups = groupTree(rows ?? []);
 
@@ -167,44 +190,73 @@ export function MapPage({
         </div>
       </section>
       {comparing ? (
-        <section className="pane" aria-label="文件">
-          <h2>文件</h2>
+        <section className="pane" aria-label="目录">
+          <h2>目录</h2>
           {diffError ? <p className="muted">{diffError}</p> : null}
           {diff?.error ? <p className="muted">{diff.error}</p> : null}
           {diff && diff.files.length === 0 && !diff.error ? <p className="muted">与 base 没有 diff。</p> : null}
-          <ul className="file-list">
-            {diff?.files.map((item) => (
-              <li key={item.path}>
-                <button
-                  type="button"
-                  className={diff.file === item.path ? "selected" : ""}
-                  onClick={() => setPicked({ key: routeKey, path: item.path })}
-                >
-                  <span className="mono">{item.status}</span>
-                  <span>{item.path}</span>
-                  <span className="muted">+{item.added} −{item.removed}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {diff && diff.files.length > 0 ? (
+            <FileTree
+              files={diff.files}
+              activeDir={activeDir}
+              activeFile={activeFile}
+              onAll={() => {
+                setActiveDir(null);
+                setActiveFile(null);
+                diffPane.current?.scrollTo({ top: 0 });
+              }}
+              onDir={(path) => {
+                setActiveDir(path);
+                setActiveFile(null);
+                diffPane.current?.scrollTo({ top: 0 });
+              }}
+              onFile={(path) => {
+                if (activeDir && path !== activeDir && !path.startsWith(`${activeDir}/`)) setActiveDir(null);
+                setActiveFile(path);
+              }}
+            />
+          ) : null}
         </section>
       ) : null}
       {comparing ? (
-        <section className="pane diff-pane" aria-label="side-by-side diff">
+        <section className="pane diff-pane" aria-label="side-by-side diff" ref={diffPane}>
           <h2>左 base · 右 worktree</h2>
           {diff ? (
             <p className="muted">
               {diff.base} · {diff.head}
               {diff.dirty ? " · 工作区有未提交改动" : ""}
-              {diff.file ? ` · ${diff.file}` : ""}
+              {activeDir ? ` · 目录 ${activeDir}` : " · 全部"}
             </p>
           ) : (
             <p className="muted">读取 diff</p>
           )}
-          {diff?.binary ? <p className="muted">二进制文件，无法左右对照。</p> : null}
-          {diff?.truncated ? <p className="muted">diff 已截断，只显示前 400 行。</p> : null}
+          {activeDir ? (
+            <p><button type="button" className="text-btn" onClick={() => { setActiveDir(null); setActiveFile(null); }}>显示全部</button></p>
+          ) : null}
+          {diff?.sectionsTruncated ? <p className="muted">只显示前 40 个文件。</p> : null}
+          <DiffSections diff={diff} dir={activeDir} />
+        </section>
+      ) : null}
+    </main>
+  );
+}
+
+function DiffSections({ diff, dir }: { diff: DiffPayload | null; dir: string | null }) {
+  const sections = filesUnder(sectionsOf(diff), dir);
+  if (!diff || diff.error || sections.length === 0) return null;
+  return (
+    <>
+      {sections.map((section) => (
+        <article key={section.path} id={fileAnchor(section.path)} className="diff-file">
+          <h3>
+            <span className="mono">{section.status}</span>
+            <span>{section.path}</span>
+            <span className="muted">+{section.added} −{section.removed}</span>
+          </h3>
+          {section.binary ? <p className="muted">二进制文件，无法左右对照。</p> : null}
+          {section.truncated ? <p className="muted">diff 已截断，只显示前 400 行。</p> : null}
           <div className="diff-table">
-            {diff?.rows.map((row, index) => (
+            {section.rows.map((row, index) => (
               <div key={`${row.kind}-${row.leftNo ?? "x"}-${row.rightNo ?? "y"}-${index}`} className={`diff-row ${row.kind}`}>
                 <div className="cell">
                   <span className="ln">{row.leftNo ?? ""}</span>
@@ -217,10 +269,29 @@ export function MapPage({
               </div>
             ))}
           </div>
-        </section>
-      ) : null}
-    </main>
+        </article>
+      ))}
+    </>
   );
+}
+
+function sectionsOf(diff: DiffPayload | null): DiffSection[] {
+  if (!diff) return [];
+  if (diff.sections.length > 0) return diff.sections;
+  if (!diff.file) return [];
+  return [{
+    path: diff.file,
+    status: "",
+    added: 0,
+    removed: 0,
+    binary: diff.binary,
+    truncated: diff.truncated,
+    rows: diff.rows,
+  }];
+}
+
+function fileAnchor(path: string): string {
+  return `diff-file-${path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 function groupTree(rows: WorktreeRow[]): RepoGroup[] {

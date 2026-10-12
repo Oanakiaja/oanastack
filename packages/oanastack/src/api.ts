@@ -88,6 +88,10 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
     const repo = feature.repos.find((item) => item.name === repoName);
     if (!repo) throw new StoreError(`repo not on feature: ${repoName}`, "not_found");
     const file = c.req.query("file");
+    const dir = c.req.query("dir");
+    if (dir && (dir.startsWith("/") || dir.split("/").includes(".."))) {
+      throw new StoreError("dir must be a relative path inside the diff", "invalid");
+    }
     return c.json(
       diffWorktree(
         {
@@ -97,6 +101,7 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
           branch: repo.branch,
         },
         file || undefined,
+        { all: c.req.query("all") === "1", dir: dir || undefined },
       ),
     );
   });

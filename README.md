@@ -157,7 +157,7 @@ oanastack serve   # http://127.0.0.1:4747 ，只绑 localhost
 
 `feature merge` / `feature close` 按仓库走完该 feature 的每一个 worktree。关闭后元数据留在 `projects/<project>/archive/<feature>/`。未合并的 feature 用 `feature close --abandon`。
 
-页面是三列：项目（各自进度）→ 选中项目的每个 worktree（状态、最近 target 结果、完成记录）→ 项目汇总（数量、已完成与进行中、最近结果、待复查）。另有 worktree 图：按 repo、base branch、branch 画树，并现场用 git 算相对 main/base 的领先/落后 commit 和行 diff（+added/−removed、改动文件数）。点开可在页面里左右对照 worktree 与 base 的 diff。登记仓库可以粘贴绝对路径，也可以在页面里逐级选目录；创建 feature 时勾选仓库，并为每个仓库填 base 分支。点开完成记录看改了什么、为什么、如何验证、风险、用户该看什么。worktree / branch 和 herdr 结果是可选自由文本。`serve` 不需要先跑；CLI 直接写同一个 SQLite 文件，页面会自己刷新。
+页面是三列：项目（各自进度）→ 选中项目的每个 worktree（状态、最近 target 结果、完成记录）→ 项目汇总（数量、已完成与进行中、最近结果、待复查）。另有 worktree 图：按 repo、base branch、branch 画树，并现场用 git 算相对 main/base 的领先/落后 commit 和行 diff（+added/−removed、改动文件数）。点开可在页面里左右对照 worktree 与 base 的 diff；左侧目录树按文件夹折叠，汇总每个目录的 +added/−removed 和文件数，点文件或文件夹会跳到或筛出对应 diff。登记仓库可以粘贴绝对路径，也可以在页面里逐级选目录；创建 feature 时勾选仓库，并为每个仓库填 base 分支。点开完成记录看改了什么、为什么、如何验证、风险、用户该看什么。worktree / branch 和 herdr 结果是可选自由文本。`serve` 不需要先跑；CLI 直接写同一个 SQLite 文件，页面会自己刷新。
 
 这套 feature 工作区和 Worktrunk（`wt`）/ `oana feature` 不是同一个目录平面。
 

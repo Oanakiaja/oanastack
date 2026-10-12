@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { filesUnder } from "./diff-tree.js";
 import { git, refExists, tail } from "./git.js";
 
 export interface WorktreeDistance {
@@ -27,17 +28,32 @@ export interface DiffRow {
   right: string | null;
 }
 
+export interface DiffSection {
+  path: string;
+  status: string;
+  added: number;
+  removed: number;
+  binary: boolean;
+  truncated: boolean;
+  rows: DiffRow[];
+}
+
 export interface WorktreeDiff {
   base: string;
   head: string;
   dirty: boolean;
   files: DiffFileStat[];
+  /** Sections included in this response. `all` or `dir` can return more than one. */
+  sections: DiffSection[];
+  sectionsTruncated: boolean;
   file: string | null;
   binary: boolean;
   truncated: boolean;
   rows: DiffRow[];
   error: string | null;
 }
+
+const SECTION_CAP = 40;
 
 const ROW_CAP = 400;
 
@@ -81,6 +97,7 @@ export function diffWorktree(
     branch: string;
   },
   file: string | undefined,
+  scope?: { all?: boolean; dir?: string },
 ): WorktreeDiff {
   const located = locate(input);
   if ("error" in located) {
@@ -88,44 +105,49 @@ export function diffWorktree(
   }
   const files = listFiles(located);
   if (files.error) return { ...blankDiff(located.base, located.head, files.error), dirty: located.dirty };
-  const chosen = file && files.files.some((item) => item.path === file) ? file : (files.files.find((item) => !item.binary)?.path ?? files.files[0]?.path ?? null);
-  if (!chosen) {
-    return { base: located.base, head: located.head, dirty: located.dirty, files: files.files, file: null, binary: false, truncated: false, rows: [], error: null };
-  }
-  const selected = files.files.find((item) => item.path === chosen);
-  if (selected?.binary) {
-    return {
-      base: located.base,
-      head: located.head,
-      dirty: located.dirty,
-      files: files.files,
-      file: chosen,
-      binary: true,
-      truncated: false,
-      rows: [],
-      error: null,
-    };
-  }
-  const raw = git(located.cwd, ["diff", "--no-color", "--unified=3", ...diffArgs(located), "--", chosen], { allowFail: true });
-  if (raw.status !== 0) {
-    return {
-      ...blankDiff(located.base, located.head, tail(raw.stderr || raw.stdout) || "git diff failed"),
-      dirty: located.dirty,
-      files: files.files,
-      file: chosen,
-    };
-  }
-  const parsed = parseSideBySide(raw.stdout);
+  const pool = scope?.dir ? filesUnder(files.files, scope.dir) : files.files;
+  const many = scope?.all === true || Boolean(scope?.dir);
+  const targets = many ? pool.slice(0, SECTION_CAP) : pickOne(files.files, file);
+  const sections = targets.map((item) => sectionFor(located, item));
+  const focus = sections.find((item) => item.path === file) ?? sections.find((item) => !item.binary) ?? sections[0] ?? null;
   return {
     base: located.base,
     head: located.head,
     dirty: located.dirty,
     files: files.files,
-    file: chosen,
+    sections,
+    sectionsTruncated: pool.length > targets.length,
+    file: focus?.path ?? null,
+    binary: focus?.binary ?? false,
+    truncated: focus?.truncated ?? false,
+    rows: focus?.rows ?? [],
+    error: null,
+  };
+}
+
+function pickOne(files: DiffFileStat[], file: string | undefined): DiffFileStat[] {
+  const chosen = file && files.some((item) => item.path === file) ? file : (files.find((item) => !item.binary)?.path ?? files[0]?.path);
+  const selected = chosen ? files.find((item) => item.path === chosen) : undefined;
+  return selected ? [selected] : [];
+}
+
+function sectionFor(located: Located, file: DiffFileStat): DiffSection {
+  if (file.binary) {
+    return { path: file.path, status: file.status, added: file.added, removed: file.removed, binary: true, truncated: false, rows: [] };
+  }
+  const raw = git(located.cwd, ["diff", "--no-color", "--unified=3", "--find-renames", ...diffArgs(located), "--", file.path], { allowFail: true });
+  if (raw.status !== 0) {
+    return { path: file.path, status: file.status, added: file.added, removed: file.removed, binary: false, truncated: false, rows: [] };
+  }
+  const parsed = parseSideBySide(raw.stdout);
+  return {
+    path: file.path,
+    status: file.status,
+    added: file.added,
+    removed: file.removed,
     binary: false,
     truncated: parsed.truncated,
     rows: parsed.rows,
-    error: null,
   };
 }
 
@@ -319,5 +341,17 @@ function normalizeNumstatPath(raw: string): string {
 }
 
 function blankDiff(base: string, head: string, error: string): WorktreeDiff {
-  return { base, head, dirty: false, files: [], file: null, binary: false, truncated: false, rows: [], error };
+  return {
+    base,
+    head,
+    dirty: false,
+    files: [],
+    sections: [],
+    sectionsTruncated: false,
+    file: null,
+    binary: false,
+    truncated: false,
+    rows: [],
+    error,
+  };
 }
