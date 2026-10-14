@@ -124,6 +124,43 @@ oana grokc --help
 
 Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另起一套目录。审批默认 pending，转给人工后再 `oana grokc approve`；只有用户明确要求时才用 `--auto-approve`。
 
+## 进度看板
+
+`oanastack` 是本仓的 TypeScript CLI（`packages/oanastack/`）。它把仓库、多仓 feature、目标、完成记录记到本地 SQLite，并用 localhost 页面供人复查。需要 Node.js >= 22.13。
+
+默认根目录 `~/.oanastack/`，数据库是里面的 `oanastack.sqlite`。`oanastack config root <path>` 把根目录指到别处（不移动已有数据库）。`OANASTACK_HOME` 和 `OANASTACK_DB` 优先于 `~/.config/oanastack/oanastack.json`。这个配置文件和 `repos.toml` 无关。
+
+```bash
+REPO_ROOT="$HOME/Documents/github/oanastack"
+mkdir -p ~/.local/bin
+ln -s "$REPO_ROOT/bin/oanastack" ~/.local/bin/oanastack
+```
+
+`bin/oanastack` 在 `dist/cli.js` 缺失时会在 `packages/oanastack` 里安装依赖并 build。Agent 写法见 `skills/oanastack-progress/SKILL.md`。日志命令都支持 `--json`。
+
+```bash
+oanastack repo add billing --path "$HOME/src/billing" --test "npm test" --json
+oanastack repo add ledger --path "$HOME/src/ledger" --json
+oanastack project add billing-api --name "Billing API" --json
+oanastack feature new billing-api charge-keys --repo billing:main --repo ledger:main --goal "One charge per checkout" --json
+oanastack target add billing-api "Idempotent charge keys" --feature charge-keys --repo billing --json
+oanastack target result 1 success --summary "one charge" --json
+oanastack done 1 --changed "…" --why "…" --verified "npm test" --check "place the order twice" --json
+oanastack feature merge charge-keys --json          # 每个仓库同步 base、跑测试、push 并打开 PR
+oanastack feature merge charge-keys --local --json  # 改为合进本地 base
+oanastack feature close charge-keys --json          # 已合并且干净后归档并删 worktree
+oanastack show --json
+oanastack serve   # http://127.0.0.1:4747 ，只绑 localhost
+```
+
+仓库根目录在磁盘任何位置，用绝对路径登记，不克隆进 `~/.oanastack`。一个 feature 可以跨多个仓库。工作区是 `~/.oanastack/projects/<project>/features/<feature>/`：每个仓库一个 worktree（`features/<feature>/<repo>/`），旁边是 `.oanastack/feature.json`、`.oanastack/tasks.md` 和给 agent 的 `AGENTS.md`（目标、仓库、分支、进度、CLI 记法）。这些文件会在记录变化时更新。`tasks.md` 只在创建时生成，之后留给人和 agent 改。
+
+`feature merge` / `feature close` 按仓库走完该 feature 的每一个 worktree。关闭后元数据留在 `projects/<project>/archive/<feature>/`。未合并的 feature 用 `feature close --abandon`。
+
+页面左侧始终是树：项目 → base branch → worktree。每一行只有名称、状态标签，以及相对 main/base 的领先/落后。右侧默认是项目汇总（数量、已完成与进行中、最近结果、等 review）。点一个 worktree 后，右侧换成它的状态、对话轮次、target 结果、完成记录，以及相对 base 的左右 diff（目录按扩展名显示图标，代码按语言着色）。对话轮次默认收起。登记仓库可以粘贴绝对路径，也可以在页面里逐级选目录；创建 feature 时勾选仓库，并为每个仓库填 base 分支。点开完成记录看改了什么、为什么、如何验证、风险、用户该看什么。worktree / branch 和 herdr 结果是可选自由文本。`serve` 不需要先跑；CLI 直接写同一个 SQLite 文件，页面会自己刷新。
+
+这套 feature 工作区和 Worktrunk（`wt`）/ `oana feature` 不是同一个目录平面。
+
 ## Playbooks（借鉴 pstack）
 
 薄 playbook 层，不替换 `oana` 骨干（一个 feature → 多仓 worktree → 做完再批量 merge）。Agent 按任务匹配后把步骤抄到 todo。索引与路由见 `skills/oanastack/playbooks/README.md`。

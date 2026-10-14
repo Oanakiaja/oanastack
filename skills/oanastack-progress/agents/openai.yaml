@@ -1,0 +1,4 @@
+interface:
+  display_name: "oanastack progress"
+  short_description: "用 oanastack CLI 登记仓库、开多仓 feature，并记录 target、result 和 completion"
+  default_prompt: "使用 $oanastack-progress，用 oanastack CLI --json 记下仓库、feature、目标、结果和完成记录。"

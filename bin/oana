@@ -368,6 +368,17 @@ Usage:
   oana feature done <slug> [--force]
   oana grokc <action> [args...]
   oana agent <action> [args...]
+  oanastack serve|config|repo|project|feature|target|done|show
+
+Progress dashboard (bin/oanastack, Node.js >= 22.13):
+  oanastack serve
+  oanastack config root [path]
+  oanastack repo add|ls
+  oanastack project add|ls|get
+  oanastack feature new|ls|status|merge|close
+  oanastack target add|ls|get|result|link
+  oanastack done <target-id> --changed --why --verified
+  Skill: skills/oanastack-progress/SKILL.md
 
 Coding-agent sessions (CloudAgent verbs):
   oana grokc launch|reply|get|list|watch|dump|cancel|archive|rename|approve …

@@ -13,6 +13,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - Agent readiness 评估（`/agent-readiness-report`）：`../agent-readiness-report/SKILL.md`（独立通用量表，只评估，不自动修复）
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
 - 长 coding session（`oana grokc`）：`../grokc-local-coding-agents/SKILL.md`
+- 进度记录（repo / feature 工作区 / target / completion，本地看板）：`../oanastack-progress/SKILL.md`
 - 功能开发参考：`references/feature.md`
 - UI 状态（数据源 / 建模 / Electron）：`references/ui-state.md`
 - UI oxlint 循环（模板）：`references/ui-state-oxlint.md`（`references/templates/oxlintrc.react.json`）
