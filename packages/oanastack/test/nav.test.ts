@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { featureLabel, targetLabel } from "../web/src/labels";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "../web/src/nav-tree";
 import { parseHash, projectHash, worktreeHash } from "../web/src/route";
 
@@ -43,5 +44,15 @@ describe("dashboard navigation", () => {
     });
     expect(projectHash("billing-api")).toBe("#/p/billing-api");
     expect(worktreeHash("billing-api", "charge-keys", "billing")).toBe("#/p/billing-api/charge-keys/billing");
+  });
+
+  it("names each status for the colored label", () => {
+    expect(featureLabel("open")).toBe("进行中");
+    expect(featureLabel("review")).toBe("等 review");
+    expect(featureLabel("done")).toBe("已完成");
+    expect(featureLabel("abandoned")).toBe("已放弃");
+    expect(targetLabel("failed")).toBe("失败");
+    expect(targetLabel("success")).toBe("成功");
+    expect(targetLabel("rejected")).toBe("不做");
   });
 });

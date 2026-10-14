@@ -83,7 +83,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 
 .split {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
@@ -131,6 +131,13 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .nav-row.selected { background: var(--soft); }
 .nav-base { margin: 0 0 4px 8px; padding-left: 8px; border-left: 1px solid var(--line); }
 .nav-base-name { margin: 4px 0 1px; color: var(--muted); }
+.nav-row .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nav-row .dist {
   margin-left: auto;
   color: var(--muted);
@@ -139,17 +146,24 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
   white-space: nowrap;
 }
 
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1px solid var(--ink);
+.pill {
   display: inline-block;
   flex: none;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 550;
+  white-space: nowrap;
 }
-.dot.done, .dot.review { background: var(--ink); }
-.dot.abandoned, .dot.open { background: transparent; }
-.dot.abandoned { border-color: var(--muted); }
+
+.pill.open { background: #e4eef8; color: #1e4d7b; }
+.pill.review { background: #f4ecd8; color: #6d5420; }
+.pill.done { background: #e3f1e4; color: #1f5c32; }
+.pill.success { background: #e5f3ee; color: #1d5c48; }
+.pill.failed { background: #f8e6e4; color: #8a3a34; }
+.pill.rejected { background: #eee8f4; color: #53486a; }
+.pill.abandoned, .pill.unknown { background: #eceae6; color: #5c564e; }
 
 .pane {
   min-height: 0;
@@ -294,8 +308,6 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .record div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 6px; padding: 2px 0; }
 .record dt { color: var(--muted); }
 .record dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-
-.status { color: var(--muted); }
 
 .rollup h3 { margin: 14px 0 6px; font-size: 12px; font-weight: 650; }
 .counts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 6px; }

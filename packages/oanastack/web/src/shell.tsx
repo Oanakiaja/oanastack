@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Completion, Feature, FeatureRepoLink, Overview, Project, Target } from "../../src/types.ts";
 import { DiffPanel } from "./diff-view";
-import { featureLabel, formatTime, targetLabel } from "./labels";
+import { formatTime } from "./labels";
+import { StatusPill } from "./status-pill";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "./nav-tree";
 import { projectHash, worktreeHash } from "./route";
 import { FeatureForm, ProjectForm, RepoForm } from "./setup";
@@ -153,8 +154,8 @@ function WorktreeRow({
       href={worktreeHash(project, node.featureSlug, node.repoName)}
       aria-current={selected ? "true" : undefined}
     >
-      <i className={`dot ${node.featureStatus}`} aria-hidden="true" />
       <span className="name">{worktreeName(node, siblings)}</span>
+      <StatusPill kind="feature" status={node.featureStatus} />
       {distance ? <span className="dist">{distance}</span> : null}
     </a>
   );
@@ -257,8 +258,7 @@ function WorktreeDetail({
         <header className="detail-head">
           <h2>{repo.name}</h2>
           <p>
-            <i className={`dot ${feature.status}`} aria-hidden="true" />
-            <span className="status">{featureLabel(feature.status)}</span>
+            <StatusPill kind="feature" status={feature.status} />
             <span className="muted">{feature.slug}</span>
           </p>
           <p className="mono">{repo.baseBranch} → {repo.branch}</p>
@@ -299,7 +299,7 @@ function TargetBlock({ target }: { target: Target }) {
       <p className="target-line">
         <span className="mono">#{target.id}</span>
         <span>{target.title}</span>
-        <span className="status">{targetLabel(target.status)}</span>
+        <StatusPill kind="target" status={target.status} />
       </p>
       {target.summary ? <p className="muted">{target.summary}</p> : null}
       {target.completions.length === 0 ? <p className="muted">没有完成记录。</p> : null}
@@ -345,7 +345,7 @@ function Rollup({ project }: { project: Project }) {
         <span>feature</span>
         <span>已完成 {countStatus(features, "done")}</span>
         <span>进行中 {countStatus(features, "open")}</span>
-        <span>待复查 {countStatus(features, "review")}</span>
+        <span>等 review {countStatus(features, "review")}</span>
         <span>已放弃 {countStatus(features, "abandoned")}</span>
       </p>
       <p className="counts">
@@ -360,18 +360,18 @@ function Rollup({ project }: { project: Project }) {
       <ul className="plain">
         {recent.map((target) => (
           <li key={target.id}>
-            <span className="status">{targetLabel(target.status)}</span>
+            <StatusPill kind="target" status={target.status} />
             <span>{target.title}</span>
             {target.summary ? <span className="muted">{target.summary}</span> : null}
           </li>
         ))}
       </ul>
-      <h3>待复查</h3>
-      {reviewFeatures.length === 0 && checks.length === 0 ? <p className="muted">没有待复查的条目。</p> : null}
+      <h3>等 review</h3>
+      {reviewFeatures.length === 0 && checks.length === 0 ? <p className="muted">没有等待 review 的条目。</p> : null}
       <ul className="plain">
         {reviewFeatures.map((item) => (
           <li key={item.id}>
-            <span>待复查</span>
+            <StatusPill kind="feature" status={item.status} />
             <span>{item.slug}</span>
             {item.goal ? <span className="muted">{item.goal}</span> : null}
           </li>

@@ -3,7 +3,7 @@ export function featureLabel(status: string): string {
     case "open":
       return "进行中";
     case "review":
-      return "待复查";
+      return "等 review";
     case "done":
       return "已完成";
     case "abandoned":
