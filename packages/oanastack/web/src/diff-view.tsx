@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { filesUnder } from "../../src/diff-tree";
+import { highlightCode } from "./code-highlight";
+import { FileIcon } from "./file-icons";
+import { languageOf } from "./file-kind";
 import { FileTree } from "./file-tree";
 
 interface DiffRow {
@@ -146,32 +149,48 @@ function DiffSections({ diff, dir }: { diff: DiffPayload | null; dir: string | n
   if (!diff || diff.error || sections.length === 0) return null;
   return (
     <>
-      {sections.map((section) => (
-        <article key={section.path} id={fileAnchor(section.path)} className="diff-file">
-          <h3>
-            <span className="mono">{section.status}</span>
-            <span>{section.path}</span>
-            <span className="muted">+{section.added} −{section.removed}</span>
-          </h3>
-          {section.binary ? <p className="muted">二进制文件，无法左右对照。</p> : null}
-          {section.truncated ? <p className="muted">diff 已截断，只显示前 400 行。</p> : null}
-          <div className="diff-table">
-            {section.rows.map((row, index) => (
-              <div key={`${row.kind}-${row.leftNo ?? "x"}-${row.rightNo ?? "y"}-${index}`} className={`diff-row ${row.kind}`}>
-                <div className="cell">
-                  <span className="ln">{row.leftNo ?? ""}</span>
-                  <span className="txt">{row.left ?? ""}</span>
+      {sections.map((section) => {
+        const language = languageOf(section.path);
+        const name = section.path.split("/").pop() ?? section.path;
+        return (
+          <article key={section.path} id={fileAnchor(section.path)} className="diff-file">
+            <h3>
+              <span className="mono">{section.status}</span>
+              <FileIcon name={name} />
+              <span>{section.path}</span>
+              <span className="muted">+{section.added} −{section.removed}</span>
+            </h3>
+            {section.binary ? <p className="muted">二进制文件，无法左右对照。</p> : null}
+            {section.truncated ? <p className="muted">diff 已截断，只显示前 400 行。</p> : null}
+            <div className="diff-table">
+              {section.rows.map((row, index) => (
+                <div key={`${row.kind}-${row.leftNo ?? "x"}-${row.rightNo ?? "y"}-${index}`} className={`diff-row ${row.kind}`}>
+                  <CodeCell lineNo={row.leftNo} text={row.left} language={language} />
+                  <CodeCell lineNo={row.rightNo} text={row.right} language={language} />
                 </div>
-                <div className="cell">
-                  <span className="ln">{row.rightNo ?? ""}</span>
-                  <span className="txt">{row.right ?? ""}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-      ))}
+              ))}
+            </div>
+          </article>
+        );
+      })}
     </>
+  );
+}
+
+function CodeCell({
+  lineNo,
+  text,
+  language,
+}: {
+  lineNo: number | null;
+  text: string | null;
+  language: string | null;
+}) {
+  return (
+    <div className="cell">
+      <span className="ln">{lineNo ?? ""}</span>
+      <span className="txt" dangerouslySetInnerHTML={{ __html: highlightCode(text ?? "", language) }} />
+    </div>
   );
 }
 

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { highlightCode } from "../web/src/code-highlight";
+import { iconKind, languageOf } from "../web/src/file-kind";
 import { featureLabel, targetLabel } from "../web/src/labels";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "../web/src/nav-tree";
 import { parseHash, projectHash, worktreeHash } from "../web/src/route";
@@ -54,5 +56,22 @@ describe("dashboard navigation", () => {
     expect(targetLabel("failed")).toBe("失败");
     expect(targetLabel("success")).toBe("成功");
     expect(targetLabel("rejected")).toBe("不做");
+  });
+
+  it("maps file extensions to an icon and a highlight language", () => {
+    expect(iconKind("keys.ts")).toBe("typescript");
+    expect(iconKind("App.tsx")).toBe("tsx");
+    expect(iconKind("package.json")).toBe("json");
+    expect(iconKind("README.md")).toBe("markdown");
+    expect(iconKind("Dockerfile")).toBe("file");
+    expect(languageOf("src/charge.ts")).toBe("typescript");
+    expect(languageOf("src/api/keys.json")).toBe("json");
+    expect(languageOf("script.sh")).toBe("bash");
+    expect(languageOf("README")).toBeNull();
+    const colored = highlightCode("export const keys = true;", "typescript");
+    expect(colored).toContain("hljs-keyword");
+    expect(colored).toContain("export");
+    expect(highlightCode('{ "ok": 1 }', "json")).toContain("hljs-attr");
+    expect(highlightCode("a < b", null)).toBe("a &lt; b");
   });
 });

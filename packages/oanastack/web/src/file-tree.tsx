@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { buildDiffTree, type DiffTreeDir, type DiffTreeFile } from "../../src/diff-tree";
+import { FileIcon, FolderIcon } from "./file-icons";
 
 export interface TreeFile {
   path: string;
@@ -83,6 +84,7 @@ function DirBody({
                 {open ? "▾" : "▸"}
               </button>
               <button type="button" className="dir-hit" onClick={() => onDir(child.path)}>
+                <FolderIcon open={open} />
                 <span className="name">{child.name}</span>
                 <span className="muted">{rollup(child)}</span>
               </button>
@@ -112,6 +114,7 @@ function FileRow({ file, selected, onFile }: { file: DiffTreeFile; selected: boo
   return (
     <button type="button" className={selected ? "file-line selected" : "file-line"} onClick={() => onFile(file.path)}>
       <span className="mono letter">{file.status}</span>
+      <FileIcon name={file.name} />
       <span className="name">{file.name}</span>
       <span className="muted">+{file.added} −{file.removed}</span>
     </button>
