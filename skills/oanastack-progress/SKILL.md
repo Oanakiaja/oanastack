@@ -58,7 +58,7 @@ oanastack serve
 
 `--verified` 写测试命令、截图路径或链接。`--check` 写用户该看什么、期望什么。没有未完成的部分就省略 `--risks`。
 
-`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。页面是三列：项目、每个 worktree 的进度与结果、项目汇总。另有 worktree 图，现场用 git 显示相对 base 的领先/落后和左右 diff。diff 左侧是按目录折叠的变更文件树。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
+`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。左侧始终是树：项目 → base branch → worktree（名称、状态点、领先/落后）。右侧默认是项目汇总；点开 worktree 后显示它的状态、target 结果、完成记录，以及相对 base 的左右 diff。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
 
 也可以把同一组字段放进 `--data '{"changed":"…","why":"…","verified":"…","check":"…"}'`。
 

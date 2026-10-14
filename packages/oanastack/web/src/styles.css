@@ -81,32 +81,75 @@ h2 {
 
 h3 { margin: 0; font-size: 13px; font-weight: 650; }
 
-.workspace {
+.split {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  grid-template-columns: 280px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
 
-.map-page {
-  display: block;
+.detail {
+  min-height: 0;
   height: 100%;
-  min-height: 0;
-  overflow: auto;
-}
-
-.map-page > .pane { max-width: 720px; }
-
-.map-page.comparing {
   display: grid;
-  grid-template-columns: 200px 280px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 42%) minmax(0, 1fr);
   overflow: hidden;
 }
 
-.map-page.comparing > .pane {
-  max-width: none;
+.detail-meta {
   overflow: auto;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--line);
 }
+
+.detail-head p {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 2px 0;
+}
+
+.detail-diff {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.nav-tree, .nav-tree ul { list-style: none; margin: 0; padding: 0; }
+
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 4px;
+  text-decoration: none;
+}
+
+.nav-project { font-weight: 650; margin-top: 8px; }
+.nav-row.selected { background: var(--soft); }
+.nav-base { margin: 0 0 4px 8px; padding-left: 8px; border-left: 1px solid var(--line); }
+.nav-base-name { margin: 4px 0 1px; color: var(--muted); }
+.nav-row .dist {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+  display: inline-block;
+  flex: none;
+}
+.dot.done, .dot.review { background: var(--ink); }
+.dot.abandoned, .dot.open { background: transparent; }
+.dot.abandoned { border-color: var(--muted); }
 
 .pane {
   min-height: 0;
@@ -346,11 +389,13 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 
 @media (max-width: 980px) {
   .app { height: auto; min-height: 100vh; overflow: visible; }
-  .workspace, .map-page, .map-page.comparing {
+  .split, .detail, .detail-diff {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
     height: auto;
     overflow: visible;
   }
+  .detail-meta { max-height: none; }
   .pane { overflow: visible; border-right: 0; border-bottom: 1px solid var(--line); }
   .top nav { margin-left: 0; }
 }

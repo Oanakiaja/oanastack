@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Overview, Project } from "../../src/types.ts";
-import { Board } from "./board";
-import { MapPage } from "./map";
-import { boardHash, mapHash, readRoute, type Route } from "./route";
+import { distanceKey, Shell } from "./shell";
+import { projectHash, readRoute, type Route } from "./route";
+
+interface Distance {
+  ahead: number | null;
+  behind: number | null;
+}
 
 export function App() {
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -10,6 +14,7 @@ export function App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [route, setRoute] = useState<Route>(() => readRoute());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [distances, setDistances] = useState<Record<string, Record<string, Distance>>>({});
 
   const load = useCallback(async () => {
     try {
@@ -34,12 +39,40 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  const slugKey = overview?.projects.map((item) => item.slug).join("\n") ?? "";
+
+  useEffect(() => {
+    if (!overview) return;
+    let cancelled = false;
+    const projects = overview.projects;
+    void Promise.all(
+      projects.map(async (item) => {
+        const response = await fetch(`/api/projects/${encodeURIComponent(item.slug)}/worktrees`);
+        if (!response.ok) return [item.slug, {}] as const;
+        const body = (await response.json()) as {
+          worktrees: Array<{ featureSlug: string; repoName: string; ahead: number | null; behind: number | null }>;
+        };
+        const map: Record<string, Distance> = {};
+        for (const row of body.worktrees) {
+          map[distanceKey(row.featureSlug, row.repoName)] = { ahead: row.ahead, behind: row.behind };
+        }
+        return [item.slug, map] as const;
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, Record<string, Distance>> = {};
+      for (const [slug, map] of entries) next[slug] = map;
+      setDistances(next);
+    }).catch(() => {
+      // The tree still renders from the database. Distance stays blank until a later refresh.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slugKey, refreshKey]);
+
   const project = selectedProject(overview, route.project);
   const error = actionError ?? loadError;
-
-  function go(hash: string) {
-    if (window.location.hash !== hash) window.location.hash = hash;
-  }
 
   return (
     <div className="app">
@@ -47,8 +80,7 @@ export function App() {
         <a className="brand" href="#/">oanastack</a>
         <span className="current">{project?.name ?? "进度"}</span>
         <nav>
-          {project && route.page === "board" ? <a href={mapHash(project.slug)}>worktree 图</a> : null}
-          {project && route.page === "map" ? <a href={boardHash(project.slug)}>返回</a> : null}
+          {project && route.feature && route.repo ? <a href={projectHash(project.slug)}>汇总</a> : null}
           <button
             type="button"
             onClick={() => {
@@ -61,17 +93,16 @@ export function App() {
         </nav>
         {error ? <p className="banner" role="status">{error}</p> : null}
       </header>
-      {route.page === "map" ? (
-        <MapPage project={route.project} feature={route.feature} repo={route.repo} refreshKey={refreshKey} />
-      ) : (
-        <Board
-          overview={overview}
-          project={project}
-          onSelect={(slug) => go(boardHash(slug))}
-          onReload={load}
-          onError={setActionError}
-        />
-      )}
+      <Shell
+        overview={overview}
+        distances={distances}
+        project={project}
+        featureSlug={route.feature}
+        repoName={route.repo}
+        refreshKey={refreshKey}
+        onError={setActionError}
+        onReload={load}
+      />
     </div>
   );
 }
