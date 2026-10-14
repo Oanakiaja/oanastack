@@ -358,6 +358,7 @@ ${progressLines(feature)}
 oanastack target add ${feature.projectSlug} "<title>" --feature ${feature.slug}${multi} --json
 oanastack target result <id> success|failed|rejected --summary "<text>" --json
 oanastack done <id> --changed "<what>" --why "<why>" --verified "<tests or links>" --check "<what to review>" --json
+oanastack round add ${feature.projectSlug} ${feature.slug} --repo <name> --summary "<short ask>" --outcome "<short result>" --instruction "<full ask>" --reply "<full reply>" --json
 oanastack feature status ${feature.slug} --project ${feature.projectSlug} --json
 \`\`\`
 `;

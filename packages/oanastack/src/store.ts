@@ -8,6 +8,7 @@ import {
   type AddFeatureInput,
   type AddProjectInput,
   type AddRepoInput,
+  type AddRoundInput,
   type AddTargetInput,
   type Completion,
   type CompletionInput,
@@ -20,6 +21,7 @@ import {
   type Project,
   type Repo,
   type ResultInput,
+  type Round,
   type ResultStatus,
   type Target,
   type TargetStatus,
@@ -33,6 +35,7 @@ const LIMITS = {
   note: 2_000,
   title: 200,
   summary: 4_000,
+  line: 200,
   path: 1_000,
   branch: 200,
   herdrStatus: 80,
@@ -351,6 +354,28 @@ export class Store {
     return this.requireTarget(id);
   }
 
+  addRound(input: AddRoundInput): Round {
+    const feature = this.getFeature(input.project, input.feature);
+    const name = requireSlug(input.repo);
+    const link = feature.repos.find((repo) => repo.name === name);
+    if (!link) throw new StoreError(`repo not on feature: ${name}`, "not_found");
+    const instruction = requireText(input.instruction, "instruction", LIMITS.body);
+    const reply = requireText(input.reply, "reply", LIMITS.body);
+    const summary = optionalText(input.summary, "summary", LIMITS.line) ?? clipLine(instruction);
+    const outcome = optionalText(input.outcome, "outcome", LIMITS.line) ?? clipLine(reply);
+    const tools = optionalText(input.tools, "tools", LIMITS.body);
+    const now = iso();
+    const info = this.db
+      .prepare(
+        `INSERT INTO rounds (feature_repo_id, summary, outcome, instruction, reply, tools, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(link.id, summary, outcome, instruction, reply, tools, now);
+    const created = this.roundRows().find((round) => round.id === rowId(info.lastInsertRowid));
+    if (!created) throw new StoreError("round not found after insert", "not_found");
+    return created;
+  }
+
   addCompletion(targetId: number, input: CompletionInput): Completion {
     const target = this.targetRow(targetId);
     if (!target) throw new StoreError(`target not found: ${targetId}`, "not_found");
@@ -522,6 +547,19 @@ export class Store {
     }));
   }
 
+  private roundRows(): Round[] {
+    return rows(this.db.prepare("SELECT * FROM rounds ORDER BY id DESC")).map((row) => ({
+      id: integer(row, "id"),
+      featureRepoId: integer(row, "feature_repo_id"),
+      summary: text(row, "summary"),
+      outcome: text(row, "outcome"),
+      instruction: text(row, "instruction"),
+      reply: text(row, "reply"),
+      tools: textOrNull(row, "tools"),
+      createdAt: text(row, "created_at"),
+    }));
+  }
+
   private completionRows(): Completion[] {
     return rows(this.db.prepare("SELECT * FROM completions ORDER BY id DESC")).map((row) => ({
       id: integer(row, "id"),
@@ -549,6 +587,7 @@ export class Store {
     const features = this.featureRows();
     const links = this.featureRepoRows();
     const repos = this.repoRows();
+    const rounds = this.roundRows();
     const featureSlugById = new Map(features.map((feature) => [feature.id, feature.slug]));
     return projects.map((project) => {
       const projectTargets = targets
@@ -579,6 +618,7 @@ export class Store {
                 branch: link.branch,
                 worktreePath: link.worktreePath,
                 prUrl: link.prUrl,
+                rounds: rounds.filter((round) => round.featureRepoId === link.id),
               };
             }),
           targets: projectTargets.filter((target) => target.featureId === feature.id),
@@ -615,6 +655,12 @@ export function progressOf(statuses: TargetStatus[]): Progress {
 
 export function assertSlug(slug: string): string {
   return requireSlug(slug);
+}
+
+function clipLine(value: string, max = 80): string {
+  const line = value.replace(/\s+/g, " ").trim();
+  if (line.length <= max) return line;
+  return `${line.slice(0, max - 1)}…`;
 }
 
 function requireSlug(slug: string): string {

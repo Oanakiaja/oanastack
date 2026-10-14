@@ -105,6 +105,27 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
       ),
     );
   });
+  app.get("/api/projects/:slug/features/:feature/repos/:repo/rounds", (c) => {
+    const feature = store.getFeature(c.req.param("slug"), c.req.param("feature"));
+    const repo = feature.repos.find((item) => item.name === c.req.param("repo"));
+    if (!repo) throw new StoreError(`repo not on feature: ${c.req.param("repo")}`, "not_found");
+    return c.json(repo.rounds);
+  });
+  app.post("/api/projects/:slug/features/:feature/repos/:repo/rounds", async (c) => {
+    const body = await readJson(c);
+    const round = store.addRound({
+      project: c.req.param("slug"),
+      feature: c.req.param("feature"),
+      repo: c.req.param("repo"),
+      instruction: requireString(body, "instruction"),
+      reply: requireString(body, "reply"),
+      summary: optionalString(body, "summary"),
+      outcome: optionalString(body, "outcome"),
+      tools: optionalString(body, "tools"),
+    });
+    syncFeatureContext(store, store.getFeature(c.req.param("slug"), c.req.param("feature")).id);
+    return c.json(round, 201);
+  });
   app.post("/api/projects/:slug/features", async (c) => {
     const body = await readJson(c);
     const feature = createFeature(store, store.root, {

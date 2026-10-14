@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Completion, Feature, FeatureRepoLink, Overview, Project, Target } from "../../src/types.ts";
+import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Target } from "../../src/types.ts";
 import { DiffPanel } from "./diff-view";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
@@ -274,6 +274,7 @@ function WorktreeDetail({
             <button className="chip" type="button" disabled={busy} onClick={() => void act("abandon")}>放弃</button>
           </div>
         ) : null}
+        <RoundList rounds={repo.rounds} />
         {targets.length === 0 ? <p className="muted">还没有 target。</p> : null}
         <ul className="target-list">
           {targets.map((target) => (
@@ -283,6 +284,61 @@ function WorktreeDetail({
       </div>
       <DiffPanel project={project.slug} feature={feature.slug} repo={repo.name} refreshKey={refreshKey} />
     </>
+  );
+}
+
+function RoundList({ rounds }: { rounds: Round[] }) {
+  const ordered = [...rounds].sort((a, b) => b.id - a.id);
+  return (
+    <section className="rounds">
+      <h3>对话轮次</h3>
+      {ordered.length === 0 ? <p className="muted">还没有对话轮次。</p> : null}
+      <ul className="plain">
+        {ordered.map((round) => (
+          <RoundRow key={round.id} round={round} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RoundRow({ round }: { round: Round }) {
+  const [open, setOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  return (
+    <li className="round">
+      <button
+        type="button"
+        className="text-btn round-line"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="mono">#{round.id}</span>
+        <span>{round.summary}</span>
+        <span className="muted">{round.outcome}</span>
+      </button>
+      {open ? (
+        <div className="round-body">
+          <p className="muted">指令</p>
+          <pre className="round-text">{round.instruction}</pre>
+          <p className="muted">回复</p>
+          <pre className="round-text">{round.reply}</pre>
+          {round.tools ? (
+            <>
+              <button
+                type="button"
+                className="text-btn"
+                aria-expanded={toolsOpen}
+                onClick={() => setToolsOpen((current) => !current)}
+              >
+                工具过程
+              </button>
+              {toolsOpen ? <pre className="round-text">{round.tools}</pre> : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
   );
 }
 

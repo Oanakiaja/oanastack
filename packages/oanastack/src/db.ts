@@ -78,6 +78,24 @@ CREATE INDEX features_project_idx ON features(project_id);
 CREATE INDEX feature_repos_feature_idx ON feature_repos(feature_id);
 `;
 
+const ROUNDS_TABLE = `
+CREATE TABLE rounds (
+  id INTEGER PRIMARY KEY,
+  feature_repo_id INTEGER NOT NULL REFERENCES feature_repos(id) ON DELETE CASCADE,
+  summary TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  instruction TEXT NOT NULL,
+  reply TEXT NOT NULL,
+  tools TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX rounds_feature_repo_idx ON rounds(feature_repo_id);
+`;
+
+const SCHEMA_V3 = `${SCHEMA_V2}${ROUNDS_TABLE}`;
+const SCHEMA_V2_TO_V3 = ROUNDS_TABLE;
+
 const SCHEMA_V1_TO_V2 = `
 ALTER TABLE targets ADD COLUMN feature_id INTEGER;
 CREATE INDEX targets_feature_idx ON targets(feature_id);
@@ -136,11 +154,15 @@ export function openDatabase(dbPath: string): DatabaseSync {
 function migrate(db: DatabaseSync): void {
   const row = db.prepare("PRAGMA user_version").get();
   const version = row && typeof row.user_version === "number" ? row.user_version : 0;
-  if (version >= 2) return;
+  if (version >= 3) return;
   db.exec("BEGIN");
   try {
-    db.exec(version < 1 ? SCHEMA_V2 : SCHEMA_V1_TO_V2);
-    db.exec("PRAGMA user_version = 2;");
+    if (version < 1) db.exec(SCHEMA_V3);
+    else {
+      if (version < 2) db.exec(SCHEMA_V1_TO_V2);
+      db.exec(SCHEMA_V2_TO_V3);
+    }
+    db.exec("PRAGMA user_version = 3;");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

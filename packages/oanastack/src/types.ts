@@ -55,6 +55,17 @@ export interface Repo {
   updatedAt: string;
 }
 
+export interface Round {
+  id: number;
+  featureRepoId: number;
+  summary: string;
+  outcome: string;
+  instruction: string;
+  reply: string;
+  tools: string | null;
+  createdAt: string;
+}
+
 export interface FeatureRepoLink {
   id: number;
   repoId: number;
@@ -65,6 +76,18 @@ export interface FeatureRepoLink {
   branch: string;
   worktreePath: string | null;
   prUrl: string | null;
+  rounds: Round[];
+}
+
+export interface AddRoundInput {
+  project: string;
+  feature: string;
+  repo: string;
+  instruction: string;
+  reply: string;
+  summary?: string | null;
+  outcome?: string | null;
+  tools?: string | null;
 }
 
 export interface Feature {

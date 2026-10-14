@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCli } from "../src/cli/run.js";
+import { openStore } from "../src/store.js";
 
 function tempDb(): string {
   return path.join(mkdtempSync(path.join(tmpdir(), "oanastack-")), "oanastack.sqlite");
@@ -119,5 +120,55 @@ describe("cli", () => {
     const missing = await capture(["done", "1", "--json"], dbPath);
     expect(missing.code).toBe(2);
     expect(JSON.parse(missing.stderr).error).toContain("--changed");
+  });
+
+  it("logs one agent turn on a repo worktree", async () => {
+    const dbPath = tempDb();
+    const store = openStore(dbPath);
+    store.addProject({ slug: "billing-api" });
+    store.addRepo({ name: "billing", path: "/tmp/billing" });
+    store.addFeature({
+      project: "billing-api",
+      slug: "charge-keys",
+      workspacePath: "/tmp/ws",
+      repos: [{ repo: "billing", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/wt" }],
+    });
+    store.close();
+
+    const added = await capture(
+      [
+        "round",
+        "add",
+        "billing-api",
+        "charge-keys",
+        "--repo",
+        "billing",
+        "--data",
+        JSON.stringify({
+          summary: "add an idempotency key",
+          outcome: "stored the key",
+          instruction: "Add an idempotency key before capture.",
+          reply: "Stored the key in src/charge.ts.",
+          tools: "read src/charge.ts",
+        }),
+        "--json",
+      ],
+      dbPath,
+    );
+    expect(added.code).toBe(0);
+    expect(JSON.parse(added.stdout)).toMatchObject({
+      id: 1,
+      summary: "add an idempotency key",
+      outcome: "stored the key",
+      tools: "read src/charge.ts",
+    });
+
+    const listed = await capture(["round", "ls", "billing-api", "charge-keys", "--repo", "billing", "--json"], dbPath);
+    expect(listed.code).toBe(0);
+    expect(JSON.parse(listed.stdout)).toMatchObject([{ id: 1, summary: "add an idempotency key" }]);
+
+    const bare = await capture(["round", "add", "billing-api", "charge-keys", "--repo", "billing", "--json"], dbPath);
+    expect(bare.code).toBe(2);
+    expect(JSON.parse(bare.stderr).error).toContain("--instruction");
   });
 });

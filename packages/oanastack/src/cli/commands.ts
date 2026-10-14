@@ -3,7 +3,7 @@ import { StoreError } from "../errors.js";
 import { openStore, type Store } from "../store.js";
 import { startServer } from "../server.js";
 import { resolveWebRoot } from "../api.js";
-import type { CompletionInput, Project, Target } from "../types.js";
+import type { AddRoundInput, CompletionInput, Project, Round, Target } from "../types.js";
 import { syncFeatureContext } from "../workspace.js";
 import { CLI_BIN_NAME, DEFAULT_PORT, PACKAGE_VERSION } from "../version.js";
 import { configCommand, featureCommand, repoCommand } from "./workspace-commands.js";
@@ -283,6 +283,71 @@ const done = defineCommand({
   },
 });
 
+const roundAdd = defineCommand({
+  meta: {
+    name: `${CLI_BIN_NAME} round add`,
+    description: "Log one agent turn on a repo worktree",
+  },
+  args: {
+    project: { type: "positional", description: "Project slug", required: true },
+    feature: { type: "positional", description: "Feature slug", required: true },
+    repo: { type: "string", description: "Repo name", required: true },
+    instruction: { type: "string", description: "Full instruction" },
+    reply: { type: "string", description: "Full reply" },
+    summary: { type: "string", description: "Short instruction summary" },
+    outcome: { type: "string", description: "Short reply outcome" },
+    tools: { type: "string", description: "Optional tool chatter" },
+    data: { type: "string", description: "JSON object with the same fields" },
+    json,
+  },
+  run({ args }) {
+    if (!args.repo) throw new StoreError("--repo is required", "invalid");
+    const input = roundFromArgs(args);
+    const round = using((store) => {
+      const created = store.addRound(input);
+      syncFeatureContext(store, store.getFeature(input.project, input.feature).id);
+      return created;
+    });
+    emit(args.json === true, roundBrief(round), `round ${round.id} ${round.summary}`);
+  },
+});
+
+const roundLs = defineCommand({
+  meta: {
+    name: `${CLI_BIN_NAME} round ls`,
+    alias: "list",
+    description: "List agent turns for one worktree",
+  },
+  args: {
+    project: { type: "positional", description: "Project slug", required: true },
+    feature: { type: "positional", description: "Feature slug", required: true },
+    repo: { type: "string", description: "Repo name", required: true },
+    json,
+  },
+  run({ args }) {
+    if (!args.repo) throw new StoreError("--repo is required", "invalid");
+    const rounds = using((store) => {
+      const feature = store.getFeature(args.project, args.feature);
+      const repo = feature.repos.find((item) => item.name === args.repo);
+      if (!repo) throw new StoreError(`repo not on feature: ${args.repo}`, "not_found");
+      return repo.rounds;
+    });
+    const line = rounds.length === 0 ? "no rounds" : rounds.map((round) => `#${round.id}  ${round.summary}  ${round.outcome}`).join("\n");
+    emit(args.json === true, rounds.map(roundBrief), line);
+  },
+});
+
+const round = defineCommand({
+  meta: {
+    name: `${CLI_BIN_NAME} round`,
+    description: "Agent turns on a repo worktree",
+  },
+  subCommands: {
+    add: roundAdd,
+    ls: roundLs,
+  },
+});
+
 const show = defineCommand({
   meta: {
     name: `${CLI_BIN_NAME} show`,
@@ -341,8 +406,72 @@ export const main = defineCommand({
     feature: featureCommand,
     target,
     done,
+    round,
   },
 });
+
+function roundBrief(round: Round) {
+  return {
+    id: round.id,
+    summary: round.summary,
+    outcome: round.outcome,
+    instruction: round.instruction,
+    reply: round.reply,
+    tools: round.tools,
+    createdAt: round.createdAt,
+  };
+}
+
+function roundFromArgs(args: {
+  project: string;
+  feature: string;
+  repo: string;
+  data?: string;
+  instruction?: string;
+  reply?: string;
+  summary?: string;
+  outcome?: string;
+  tools?: string;
+}): AddRoundInput {
+  const data = jsonObject(args.data);
+  const pick = (flag: string | undefined, key: string): string | undefined => {
+    if (flag !== undefined) return flag;
+    if (!(key in data)) return undefined;
+    const value = data[key];
+    if (value === null) return undefined;
+    if (typeof value !== "string") throw new StoreError(`${key} must be a string`, "invalid");
+    return value;
+  };
+  const instruction = pick(args.instruction, "instruction");
+  const reply = pick(args.reply, "reply");
+  if (instruction === undefined || reply === undefined) {
+    throw new StoreError("round add needs --instruction and --reply", "invalid");
+  }
+  return {
+    project: args.project,
+    feature: args.feature,
+    repo: args.repo,
+    instruction,
+    reply,
+    summary: pick(args.summary, "summary"),
+    outcome: pick(args.outcome, "outcome"),
+    tools: pick(args.tools, "tools"),
+  };
+}
+
+function jsonObject(raw: string | undefined): Record<string, unknown> {
+  if (raw === undefined) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new StoreError("--data must be JSON", "invalid");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new StoreError("--data must be a JSON object", "invalid");
+  }
+  return parsed as Record<string, unknown>;
+}
 
 function completionFromArgs(args: {
   data?: string;

@@ -298,6 +298,23 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .links { display: flex; gap: 10px; margin: 2px 0 6px; }
 .links a, .tree a, .top a { text-decoration: underline; text-underline-offset: 2px; }
 
+.rounds { margin: 12px 0 4px; }
+.rounds h3 { margin: 0 0 6px; font-size: 12px; font-weight: 650; }
+.round { margin: 0 0 6px; }
+.round-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
+  text-align: left;
+}
+.round-text {
+  margin: 2px 0 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
 .target { margin: 8px 0; }
 .target-line { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0; align-items: baseline; }
 .target .muted { margin: 2px 0; }

@@ -1,6 +1,6 @@
 ---
 name: oanastack-progress
-description: Log reviewable progress with the oanastack CLI (repo, project, feature workspace, target, result, completion). Use when an agent registers a repo, opens a multi-repo feature workspace, records success/failed/rejected, or finishes work the user should review on the local dashboard. This plane is separate from oana feature / wt.
+description: Log reviewable progress with the oanastack CLI (repo, project, feature workspace, target, result, completion, round). Use when an agent registers a repo, opens a multi-repo feature workspace, records success/failed/rejected, logs an agent turn, or finishes work the user should review on the local dashboard. This plane is separate from oana feature / wt.
 ---
 
 # oanastack progress
@@ -25,7 +25,8 @@ description: Log reviewable progress with the oanastack CLI (repo, project, feat
 4. 每个目标：`target add`（带 `--feature`；多仓时再带 `--repo`）
 5. 结果已知：`target result <id> success|failed|rejected`
 6. 做完、要用户复查：`done`
-7. 每个仓库都合并且工作区干净后：`feature close`。未合并要丢掉时用 `feature close --abandon`
+7. 每一轮结束，记在对应 repo 的 worktree 上：`round add`（短摘要给列表，全文给展开；工具过程用 `--tools`，看板默认不展开）
+8. 每个仓库都合并且工作区干净后：`feature close`。未合并要丢掉时用 `feature close --abandon`
 
 先 `result` 再 `done`。`done` 不会改 target 状态。herdr 只存自由文本。已有 target 用 `target link <id> --feature <slug>` 挂到 feature 上。
 
@@ -46,6 +47,8 @@ oanastack target add <project> "<title>" [--feature <slug>] [--repo <name>] [--w
 oanastack target link <id> --feature <slug> [--project <project>] [--repo <name>] --json
 oanastack target result <id> success|failed|rejected [--summary <text>] [--wt <path>] [--branch <name>] [--herdr-status <text>] [--herdr <text>] --json
 oanastack done <id> --changed "<what>" --why "<why>" --verified "<tests/screenshots/links>" [--risks "<unfinished>"] [--check "<what the user should check>"] --json
+oanastack round add <project> <feature> --repo <name> --instruction "<full ask>" --reply "<full reply>" [--summary "<short ask>"] [--outcome "<short result>"] [--tools "<tool chatter>"] --json
+oanastack round ls <project> <feature> --repo <name> --json
 oanastack show --json
 oanastack serve
 ```
@@ -58,7 +61,7 @@ oanastack serve
 
 `--verified` 写测试命令、截图路径或链接。`--check` 写用户该看什么、期望什么。没有未完成的部分就省略 `--risks`。
 
-`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。左侧始终是树：项目 → base branch → worktree（名称、状态标签、领先/落后）。右侧默认是项目汇总；点开 worktree 后显示它的状态、target 结果、完成记录，以及相对 base 的左右 diff。目录按扩展名显示文件和文件夹图标，代码按 TS、JS、JSON 等语言着色。状态是浅色底的标签，例如进行中、等 review、已完成、失败。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
+`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。左侧始终是树：项目 → base branch → worktree（名称、状态标签、领先/落后）。右侧默认是项目汇总；点开 worktree 后显示它的状态、对话轮次、target 结果、完成记录，以及相对 base 的左右 diff。对话轮次默认收起，一行是指令摘要和回复结果；展开后是完整指令和完整回复，工具过程另收一层。目录按扩展名显示文件和文件夹图标，代码按 TS、JS、JSON 等语言着色。状态是浅色底的标签，例如进行中、等 review、已完成、失败。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
 
 也可以把同一组字段放进 `--data '{"changed":"…","why":"…","verified":"…","check":"…"}'`。
 

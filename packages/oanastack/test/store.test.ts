@@ -133,7 +133,95 @@ describe("store", () => {
 
     const again = new DatabaseSync(dbPath);
     const version = again.prepare("PRAGMA user_version").get() as { user_version: number };
-    expect(version.user_version).toBe(2);
+    expect(version.user_version).toBe(3);
     again.close();
+  });
+
+  it("upgrades a v2 database with a rounds table", () => {
+    const dbPath = tempDb();
+    const primed = openStore(dbPath);
+    primed.addProject({ slug: "billing-api" });
+    primed.addRepo({ name: "billing", path: "/tmp/billing-repo" });
+    primed.addFeature({
+      project: "billing-api",
+      slug: "charge-keys",
+      workspacePath: "/tmp/ws",
+      repos: [{ repo: "billing", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/wt" }],
+    });
+    primed.close();
+    const bare = new DatabaseSync(dbPath);
+    bare.exec("DROP TABLE rounds;");
+    bare.exec("PRAGMA user_version = 2;");
+    bare.close();
+
+    const store = openStore(dbPath);
+    const round = store.addRound({
+      project: "billing-api",
+      feature: "charge-keys",
+      repo: "billing",
+      instruction: "Add the key",
+      reply: "Stored it",
+    });
+    expect(round.summary).toBe("Add the key");
+    expect(store.getFeature("billing-api", "charge-keys").repos[0]?.rounds).toHaveLength(1);
+    store.close();
+    const again = new DatabaseSync(dbPath);
+    const version = again.prepare("PRAGMA user_version").get() as { user_version: number };
+    expect(version.user_version).toBe(3);
+    again.close();
+  });
+
+  it("stores a round on one repo worktree and clips a missing summary", () => {
+    const store = openStore(tempDb());
+    store.addProject({ slug: "billing-api" });
+    store.addRepo({ name: "billing", path: "/tmp/billing" });
+    store.addRepo({ name: "ledger", path: "/tmp/ledger" });
+    store.addFeature({
+      project: "billing-api",
+      slug: "charge-keys",
+      workspacePath: "/tmp/ws",
+      repos: [
+        { repo: "billing", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/ws/billing" },
+        { repo: "ledger", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/ws/ledger" },
+      ],
+    });
+    const round = store.addRound({
+      project: "billing-api",
+      feature: "charge-keys",
+      repo: "billing",
+      summary: "add an idempotency key",
+      outcome: "stored the key",
+      instruction: "Add an idempotency key before capture.",
+      reply: "Stored the key in src/charge.ts.",
+      tools: "read src/charge.ts",
+    });
+    expect(round.tools).toBe("read src/charge.ts");
+    const feature = store.getFeature("billing-api", "charge-keys");
+    expect(feature.repos.find((repo) => repo.name === "billing")?.rounds.map((item) => item.id)).toEqual([round.id]);
+    expect(feature.repos.find((repo) => repo.name === "ledger")?.rounds).toEqual([]);
+
+    const clipped = store.addRound({
+      project: "billing-api",
+      feature: "charge-keys",
+      repo: "billing",
+      instruction: `please ${"x".repeat(120)}`,
+      reply: "done\nand more",
+    });
+    expect(clipped.summary.endsWith("…")).toBe(true);
+    expect(clipped.summary.length).toBe(80);
+    expect(clipped.outcome).toBe("done and more");
+    expect(clipped.tools).toBeNull();
+    expect(feature.repos.find((repo) => repo.name === "billing")?.rounds[0]?.id).not.toBe(clipped.id);
+    expect(store.getFeature("billing-api", "charge-keys").repos.find((repo) => repo.name === "billing")?.rounds[0]?.id).toBe(clipped.id);
+    expect(() =>
+      store.addRound({
+        project: "billing-api",
+        feature: "charge-keys",
+        repo: "missing",
+        instruction: "x",
+        reply: "y",
+      }),
+    ).toThrow(/repo not on feature/);
+    store.close();
   });
 });

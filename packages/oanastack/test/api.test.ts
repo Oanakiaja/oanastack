@@ -63,6 +63,49 @@ describe("api", () => {
     store.close();
   });
 
+  it("stores a round on one repo worktree", async () => {
+    const store = openStore(tempDb());
+    store.addProject({ slug: "billing-api" });
+    store.addRepo({ name: "billing", path: "/tmp/billing" });
+    store.addRepo({ name: "ledger", path: "/tmp/ledger" });
+    store.addFeature({
+      project: "billing-api",
+      slug: "charge-keys",
+      workspacePath: "/tmp/ws",
+      repos: [
+        { repo: "billing", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/ws/billing" },
+        { repo: "ledger", baseBranch: "main", branch: "feature/charge-keys", worktreePath: "/tmp/ws/ledger" },
+      ],
+    });
+    const app = createApp(store, { webRoot: null });
+    const created = await app.request("/api/projects/billing-api/features/charge-keys/repos/billing/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        summary: "add an idempotency key",
+        outcome: "stored the key",
+        instruction: "Add an idempotency key before capture.",
+        reply: "Stored the key in src/charge.ts.",
+        tools: "read src/charge.ts",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const listed = await app.request("/api/projects/billing-api/features/charge-keys/repos/billing/rounds");
+    expect(listed.status).toBe(200);
+    const rounds = (await listed.json()) as Array<{ summary: string; tools: string | null }>;
+    expect(rounds).toMatchObject([{ summary: "add an idempotency key", tools: "read src/charge.ts" }]);
+    const overview = await app.request("/api/overview");
+    const body = (await overview.json()) as {
+      projects: Array<{ features: Array<{ repos: Array<{ name: string; rounds: unknown[] }> }> }>;
+    };
+    const repos = body.projects[0]?.features[0]?.repos ?? [];
+    expect(repos.find((repo) => repo.name === "billing")?.rounds).toHaveLength(1);
+    expect(repos.find((repo) => repo.name === "ledger")?.rounds).toHaveLength(0);
+    const missing = await app.request("/api/projects/billing-api/features/charge-keys/repos/notify/rounds");
+    expect(missing.status).toBe(404);
+    store.close();
+  });
+
   it("lists a directory for the repo picker", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "oanastack-browse-"));
     mkdirSync(path.join(root, "billing"));
