@@ -33,6 +33,15 @@ ln -s "$REPO_ROOT/skills/grokc-local-coding-agents" ~/.agents/skills/grokc-local
 ln -s "$REPO_ROOT/skills/herdr-grokbot" ~/.agents/skills/herdr-grokbot
 ```
 
+herdr agent（Codex / Claude，dangerously yolo）在 `done` / `blocked` 时经本地 trigger 只 POST 一次到 Grok Bot webhook：
+
+```bash
+ln -s "$REPO_ROOT/skills/oanastack-trigger" ~/.agents/skills/oanastack-trigger
+ln -s "$REPO_ROOT/bin/oanastack" ~/.local/bin/oanastack
+```
+
+`oanastack trigger serve` 监听 `127.0.0.1:4748`。`oanastack trigger start <agent> --kind codex|claude --pane <pane>` 启动并自动 attach。密钥放 `~/.oanastack/grokbot-webhook.env` 或 `~/.config/herdr/grokbot-webhook.env`（`GROKBOT_WEBHOOK` / `GROKBOT_AUTH`），不要写进仓库。
+
 ## Agent Readiness Report
 
 `skills/agent-readiness-report/` 提供独立的仓库评估流程，借鉴

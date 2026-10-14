@@ -3,3 +3,8 @@ packages/*/node_modules/
 packages/*/dist/
 packages/*/coverage/
 *.tsbuildinfo
+
+# local trigger / progress db if someone points it at the repo
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

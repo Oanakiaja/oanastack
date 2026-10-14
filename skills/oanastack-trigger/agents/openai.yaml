@@ -1,0 +1,4 @@
+interface:
+  display_name: "oanastack trigger"
+  short_description: "herdr Codex/Claude 完成或卡住时，本地 trigger 只 POST 一次到 Grok Bot webhook"
+  default_prompt: "使用 $oanastack-trigger：先 trigger serve，再用 trigger start 以 yolo 模式启动 Codex 或 Claude，并确认 done/blocked 会送到本地 trigger。"

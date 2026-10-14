@@ -1,11 +1,11 @@
 ---
 name: herdr grokbot
-description: 用 herdr 让云端 Grok Bot 经用户批准的远程 shell 驱动本机 Codex（工作区、启动、prompt、读输出、批准），并在 done/blocked 时用监听脚本把最后输出 POST 给 webhook routine 以唤醒 Grok Bot。不要用于 oana grokc 本地会话、Cursor Cloud Agent、未读屏幕就同意批准框，或把 webhook URL / Authorization 写进聊天。
+description: 用 herdr 让云端 Grok Bot 经用户批准的远程 shell 驱动本机 Codex 或 Claude（工作区、启动、prompt、读输出）。启动走 oanastack trigger start（dangerously yolo），done/blocked 由本地 trigger 去重后只 POST 一次给 webhook routine 以唤醒 Grok Bot。不要用于 oana grokc 本地会话、Cursor Cloud Agent、未读屏幕就同意批准框、绕过 trigger 直接 curl webhook，或把 webhook URL / Authorization 写进聊天。
 ---
 
 # herdr grokbot
 
-云端 Grok Bot 通过本机 [herdr](https://github.com/herdrdev/herdr) 驱动 Codex。Codex 完成或卡住时，监听脚本把最后输出 POST 给 webhook routine，再唤醒 Grok Bot。灵感 [@turingou](https://x.com/turingou/status/2108386640658038954)。
+云端 Grok Bot 通过本机 [herdr](https://github.com/herdrdev/herdr) 驱动 Codex 或 Claude。Agent 以 dangerously yolo 模式启动，并自动 attach `oanastack trigger`。完成或卡住时，本地 trigger 服务把最后输出 POST 一次给 webhook routine，再唤醒 Grok Bot。灵感 [@turingou](https://x.com/turingou/status/2108386640658038954)。
 
 herdr 是 Rust 写的、面向编程 agent 的终端复用器。文档 <https://herdr.dev/docs>。server 托管 pane，识别 agent 状态 `idle` / `working` / `blocked` / `done` / `unknown`。控制面是 CLI，本地 unix socket `~/.config/herdr/herdr.sock`（每行一个 JSON）。没有 HTTP API，不会主动发 webhook。
 
@@ -29,17 +29,17 @@ flowchart LR
     HS["herdr server"]
     CX1["Codex 会话 cx1"]
     CX2["Codex 会话 cx2"]
-    W["监听脚本 grokbot-notify.sh"]
+    TR["oanastack trigger"]
     SH -->|herdr agent start / prompt / read| HS
     HS --> CX1
     HS --> CX2
-    HS -.->|done / blocked| W
+    HS -.->|done / blocked| TR
   end
   GB -->|下发命令| SH
-  W -.->|curl POST 最后输出| WH
+  TR -.->|POST 一次，Bearer| WH
 ```
 
-循环：Grok Bot 发 prompt → Codex 干活 → `done` / `blocked` → 监听脚本 POST → routine 唤醒 Grok Bot → 决定继续、转给别的 Bot，或告诉用户。
+循环：Grok Bot 发 prompt → Codex 或 Claude 干活 → `done` / `blocked` → trigger POST 一次 → routine 唤醒 Grok Bot → 决定继续、转给别的 Bot，或告诉用户。
 
 ## 不要
 
@@ -73,11 +73,14 @@ herdr agent list
 herdr workspace create --cwd <dir> --label <x> --no-focus
 ```
 
-4. 启动 Codex。原生参数必须放在 `--` 后面。codex 0.153 没有 `--full-auto`。若 `~/.codex/config.toml` 里的 model 不被 ChatGPT 账号支持（400 model not supported），用 `-m` 覆盖：
+4. 启动 Codex 或 Claude。用 `oanastack trigger start`，不要手写 herdr 参数。两者都会加上 dangerously yolo，并在后台 attach trigger。没有 `oanastack trigger serve` 时 `start` 会自己拉起。codex 0.153 没有 `--full-auto`。若 `~/.codex/config.toml` 里的 model 不被 ChatGPT 账号支持（400 model not supported），把 `-m` 放在 `--` 后面：
 
 ```bash
-herdr agent start cx1 --kind codex --pane <pane> -- -m gpt-5.5 --sandbox workspace-write --ask-for-approval on-request
+oanastack trigger start cx1 --kind codex --pane <pane>
+oanastack trigger start cl1 --kind claude --pane <pane>
 ```
+
+这会执行 `herdr agent start <agent> --kind <kind> --pane <pane> -- <yolo flag>`。Codex 的 flag 是 `--dangerously-bypass-approvals-and-sandbox`，Claude 的是 `--dangerously-skip-permissions`。还要追加原生参数时放在 `--` 后面，例如 `-- -m gpt-5.5`。不要改用户的 `~/.codex/config.toml`。
 
 agent 名须匹配 `[a-z][a-z0-9_-]{0,31}`，且在存活 agent 中唯一。`agent start` 要的是已有的空闲 shell pane，不会自己建 pane。
 
@@ -94,7 +97,7 @@ herdr agent prompt cx1 "..." --wait --timeout 600000
 herdr agent read cx1 --source recent-unwrapped --lines 60
 ```
 
-7. 批准框：`prompt` 返回 `blocked` → 先 read 看命令 → 确认安全后：
+7. yolo 模式下工具批准框不应出现。若仍是 `blocked`，先 read：trust 提示用 `Enter`，提问确认安全后再送键。不要对没读过的屏幕送 `y`：
 
 ```bash
 herdr agent send-keys cx1 y
@@ -115,20 +118,29 @@ CLI 错误是 stderr 上的 JSON，退出码 1。
 
 ## 回调
 
-Grok Bot 建一个 webhook 触发的 routine。用户从 routine 面板复制 Webhook URL 和 Authorization header，写到 `~/.config/herdr/grokbot-webhook.env`：
+Grok Bot 建一个 webhook 触发的 routine。用户从 routine 面板复制 Webhook URL 和 Authorization header，写到 `~/.oanastack/grokbot-webhook.env` 或 `~/.config/herdr/grokbot-webhook.env`：
 
 ```bash
 GROKBOT_WEBHOOK=…
 GROKBOT_AUTH=…
 ```
 
-然后在本机跑（参数是 agent 名，默认 `cx1`）：
+本机先跑 trigger 服务，再让每个 agent 自动 attach。`trigger serve` 会盯着 `herdr agent list`，新出现的 codex / claude 都会挂上 watcher。`trigger start` 在启动时再显式 attach 一次。
+
+```bash
+oanastack trigger serve
+oanastack trigger doctor
+```
+
+也可以只盯一个 agent（参数是 agent 名，默认 `cx1`）。仓库里的 `skills/herdr-grokbot/scripts/grokbot-notify.sh` 现在转给 `oanastack trigger attach`，不再自己 POST webhook：
 
 ```bash
 skills/herdr-grokbot/scripts/grokbot-notify.sh cx1
 ```
 
-脚本轮询 `herdr agent get`。状态变成 `done` 或 `blocked` 且与上次不同时，用 `agent read --source recent-unwrapped --lines 60` 取最后输出，POST JSON `{agent, status, text}`。`GROKBOT_AUTH` 若带 `Authorization: ` 前缀，脚本会去掉再放进 header。空状态（server 还没起来）每 10 秒重试，其余每 5 秒看一次。
+watcher 把 `{agent, kind, status, summary, text, cwd, worktree, branch, ts}` 交给 `http://127.0.0.1:4748`。`branch` 来自该 cwd / worktree 的 `git rev-parse --abbrev-ref HEAD`，worktree 根来自 `git rev-parse --show-toplevel`。`oanastack trigger status` 列出每个 session 的 branch、cwd、worktree。服务去重后，只在 `done` / `blocked` 时用 `Authorization: Bearer` POST 一次到 `GROKBOT_WEBHOOK`，正文里同样带这三项。失败重试，并追加到 `~/.oanastack/trigger.log`。同一次停驻不会发第二次；状态离开 `done` / `blocked` 之后再进来，才会再发。
+
+进度看板（PR #14）还没接这条字段。每日工作先读 webhook 和 `trigger status --json`。看板和 worktree map 上按 session 显示 branch 是后续。
 
 herdr 不会主动 webhook，所以这条回路用轮询。下面三项还没在这条回路上验证：
 
