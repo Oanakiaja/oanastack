@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,13 +7,38 @@ import { startTriggerServer } from "../src/server.js";
 import { TriggerStore } from "../src/store.js";
 import { fakeWebhook, tempHome } from "./helpers.js";
 
-function fakeHerdr(home: string, logFile: string): string {
+function shQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function gitRepo(parent: string, branch: string): string {
+  const dir = path.join(parent, "repo");
+  mkdirSync(dir);
+  execFileSync("git", ["init", "-b", branch], { cwd: dir });
+  execFileSync("git", ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"], {
+    cwd: dir,
+  });
+  return dir;
+}
+
+function fakeHerdr(home: string, logFile: string, place: { cwd: string; worktree: string } = { cwd: "/work", worktree: "/work/wt" }): string {
   const file = path.join(home, "herdr");
+  const payload = JSON.stringify({
+    result: {
+      agent: {
+        name: "cx1",
+        agent: "codex",
+        agent_status: "done",
+        cwd: place.cwd,
+        worktree: place.worktree,
+      },
+    },
+  });
   writeFileSync(
     file,
     `#!/bin/sh
 if [ "$1" = "agent" ] && [ "$2" = "get" ]; then
-  printf '%s\\n' '{"result":{"agent":{"name":"cx1","agent":"codex","agent_status":"done","cwd":"/work","worktree":"/work/wt"}}}'
+  printf '%s\\n' ${shQuote(payload)}
   exit 0
 fi
 if [ "$1" = "agent" ] && [ "$2" = "read" ]; then
@@ -99,7 +125,8 @@ describe("cli", () => {
       watch: false,
     });
     try {
-      env.HERDR_BIN = fakeHerdr(home, path.join(home, "herdr.log"));
+      const repo = gitRepo(home, "feature/session-branch");
+      env.HERDR_BIN = fakeHerdr(home, path.join(home, "herdr.log"), { cwd: repo, worktree: repo });
       const attached = await capture(
         ["trigger", "attach", "cx1", "--kind", "codex", "--once", "--service-url", running.url],
         env,
@@ -113,9 +140,21 @@ describe("cli", () => {
         kind: "codex",
         status: "done",
         summary: "shipped the trigger",
-        cwd: "/work",
-        worktree: "/work/wt",
+        branch: "feature/session-branch",
+        cwd: repo,
+        worktree: repo,
       });
+      const listed = await capture(["trigger", "status", "--json"], env);
+      expect(listed.code).toBe(0);
+      expect(JSON.parse(listed.stdout).agents).toMatchObject([
+        {
+          agent: "cx1",
+          kind: "codex",
+          branch: "feature/session-branch",
+          cwd: repo,
+          worktree: repo,
+        },
+      ]);
     } finally {
       await running.close();
       store.close();
@@ -126,7 +165,8 @@ describe("cli", () => {
   it("start launches herdr in yolo mode", async () => {
     const { home, env } = tempHome();
     const logFile = path.join(home, "herdr.log");
-    env.HERDR_BIN = fakeHerdr(home, logFile);
+    const repo = gitRepo(home, "feature/session-branch");
+    env.HERDR_BIN = fakeHerdr(home, logFile, { cwd: repo, worktree: repo });
     env.HERDR_LOG = logFile;
     const started = await capture(
       ["trigger", "start", "cx1", "--kind", "codex", "--pane", "w1:p1", "--no-serve", "--no-attach", "--", "-m", "gpt-5.5"],
@@ -134,6 +174,12 @@ describe("cli", () => {
     );
     expect(started.code).toBe(0);
     expect(started.stdout).toContain("started cx1 codex");
+    expect(started.stdout).toContain("branch feature/session-branch");
+    const listed = await capture(["trigger", "status"], env);
+    expect(listed.stdout).toContain("cx1 codex");
+    expect(listed.stdout).toContain("branch feature/session-branch");
+    expect(listed.stdout).toContain(`cwd ${repo}`);
+    expect(listed.stdout).toContain(`worktree ${repo}`);
     const log = readFileSync(logFile, "utf8");
     expect(log).toContain("agent start cx1 --kind codex --pane w1:p1 -- --dangerously-bypass-approvals-and-sandbox -m gpt-5.5");
   });

@@ -138,7 +138,9 @@ oanastack trigger doctor
 skills/herdr-grokbot/scripts/grokbot-notify.sh cx1
 ```
 
-watcher 把 `{agent, kind, status, summary, text, cwd, worktree, ts}` 交给 `http://127.0.0.1:4748`。服务去重后，只在 `done` / `blocked` 时用 `Authorization: Bearer` POST 一次到 `GROKBOT_WEBHOOK`。失败重试，并追加到 `~/.oanastack/trigger.log`。同一次停驻不会发第二次；状态离开 `done` / `blocked` 之后再进来，才会再发。
+watcher 把 `{agent, kind, status, summary, text, cwd, worktree, branch, ts}` 交给 `http://127.0.0.1:4748`。`branch` 来自该 cwd / worktree 的 `git rev-parse --abbrev-ref HEAD`，worktree 根来自 `git rev-parse --show-toplevel`。`oanastack trigger status` 列出每个 session 的 branch、cwd、worktree。服务去重后，只在 `done` / `blocked` 时用 `Authorization: Bearer` POST 一次到 `GROKBOT_WEBHOOK`，正文里同样带这三项。失败重试，并追加到 `~/.oanastack/trigger.log`。同一次停驻不会发第二次；状态离开 `done` / `blocked` 之后再进来，才会再发。
+
+进度看板（PR #14）还没接这条字段。每日工作先读 webhook 和 `trigger status --json`。看板和 worktree map 上按 session 显示 branch 是后续。
 
 herdr 不会主动 webhook，所以这条回路用轮询。下面三项还没在这条回路上验证：
 

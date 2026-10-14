@@ -1,6 +1,14 @@
-import type { AgentKind, AgentStatus, HerdrSnapshot, StatusSnapshot } from "./types.js";
+import { locateCheckout } from "./git.js";
 import type { HerdrRunner } from "./herdr.js";
 import { firstLine } from "./normalize.js";
+import type { AgentKind, AgentStatus, HerdrSnapshot, StatusSnapshot } from "./types.js";
+
+export interface SessionPlace {
+  kind: AgentKind | null;
+  branch: string | null;
+  cwd: string | null;
+  worktree: string | null;
+}
 
 export interface WatchMemory {
   lastStatus: AgentStatus | null;
@@ -22,13 +30,16 @@ export async function watchOnce(options: {
   cwd?: string | null;
   worktree?: string | null;
   now?: () => Date;
+  onSession?: (place: SessionPlace) => void;
 }): Promise<WatchTick> {
   const snapshot = await options.runner.get(options.agent);
+  const place = sessionPlace(snapshot, options);
+  options.onSession?.(place);
   if (!snapshot || !snapshot.status) return { memory: options.memory, posted: false, snapshot };
   if (snapshot.status === options.memory.lastStatus) {
     return { memory: options.memory, posted: false, snapshot };
   }
-  const kind = snapshot.kind ?? options.kind ?? null;
+  const kind = place.kind;
   if (!kind) return { memory: { lastStatus: snapshot.status }, posted: false, snapshot };
   const terminal = snapshot.status === "done" || snapshot.status === "blocked";
   const text = terminal ? await options.runner.read(options.agent, options.lines ?? 60) : null;
@@ -39,11 +50,27 @@ export async function watchOnce(options: {
     status: snapshot.status,
     summary,
     text,
-    cwd: snapshot.cwd ?? options.cwd ?? null,
-    worktree: snapshot.worktree ?? options.worktree ?? null,
+    cwd: place.cwd,
+    worktree: place.worktree,
+    branch: place.branch,
     ts: (options.now ?? (() => new Date()))().toISOString(),
   });
   return { memory: { lastStatus: snapshot.status }, posted: true, snapshot };
+}
+
+export function sessionPlace(
+  snapshot: HerdrSnapshot | null,
+  options: { kind?: AgentKind; cwd?: string | null; worktree?: string | null },
+): SessionPlace {
+  const cwd = snapshot?.cwd ?? options.cwd ?? null;
+  const hinted = snapshot?.worktree ?? options.worktree ?? null;
+  const checkout = locateCheckout({ cwd, worktree: hinted });
+  return {
+    kind: snapshot?.kind ?? options.kind ?? null,
+    branch: checkout.branch,
+    cwd: cwd ?? checkout.cwd,
+    worktree: checkout.worktree ?? hinted,
+  };
 }
 
 export function seedFromStatus(status: StatusSnapshot, agent: string): WatchMemory {
@@ -78,6 +105,7 @@ export async function runWatch(options: {
   cwd?: string | null;
   worktree?: string | null;
   now?: () => Date;
+  onSession?: (place: SessionPlace) => void;
 }): Promise<void> {
   let memory = options.memory;
   while (!options.signal.aborted) {

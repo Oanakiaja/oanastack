@@ -21,6 +21,7 @@ interface AgentRow {
   last_forwarded_hash: string | null;
   cwd: string | null;
   worktree: string | null;
+  branch: string | null;
   updated_at: string;
 }
 
@@ -34,6 +35,7 @@ interface EventRow {
   text: string | null;
   cwd: string | null;
   worktree: string | null;
+  branch: string | null;
   ts: string;
   state: string;
   attempts: number;
@@ -77,8 +79,8 @@ export class TriggerStore {
       const inserted = this.db
         .prepare(
           `INSERT INTO events (
-            dedupe_key, agent, kind, status, summary, text, cwd, worktree, ts, state, attempts, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)`,
+            dedupe_key, agent, kind, status, summary, text, cwd, worktree, branch, ts, state, attempts, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)`,
         )
         .run(
           key,
@@ -89,6 +91,7 @@ export class TriggerStore {
           event.text,
           event.cwd,
           event.worktree,
+          event.branch,
           event.ts,
           nowIso,
         );
@@ -168,6 +171,29 @@ export class TriggerStore {
     return counts;
   }
 
+  recordSession(input: {
+    agent: string;
+    kind: AgentKind | null;
+    branch: string | null;
+    cwd: string | null;
+    worktree: string | null;
+    now?: Date;
+  }): void {
+    const nowIso = (input.now ?? new Date()).toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO agents (agent, kind, generation, last_status, last_forwarded_status, last_forwarded_hash, cwd, worktree, branch, updated_at)
+         VALUES (?, ?, 0, NULL, NULL, NULL, ?, ?, ?, ?)
+         ON CONFLICT(agent) DO UPDATE SET
+           kind = COALESCE(excluded.kind, agents.kind),
+           cwd = COALESCE(excluded.cwd, agents.cwd),
+           worktree = COALESCE(excluded.worktree, agents.worktree),
+           branch = COALESCE(excluded.branch, agents.branch),
+           updated_at = excluded.updated_at`,
+      )
+      .run(input.agent, input.kind, input.cwd, input.worktree, input.branch, nowIso);
+  }
+
   listAgents(): AgentCursor[] {
     const rows = this.db.prepare("SELECT * FROM agents ORDER BY agent").all() as unknown as AgentRow[];
     return rows.map(toCursor);
@@ -213,8 +239,8 @@ export class TriggerStore {
     const forwarded = isForwardStatus(event.status) ? event.status : null;
     this.db
       .prepare(
-        `INSERT INTO agents (agent, kind, generation, last_status, last_forwarded_status, last_forwarded_hash, cwd, worktree, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agents (agent, kind, generation, last_status, last_forwarded_status, last_forwarded_hash, cwd, worktree, branch, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(agent) DO UPDATE SET
            kind = excluded.kind,
            generation = excluded.generation,
@@ -223,6 +249,7 @@ export class TriggerStore {
            last_forwarded_hash = COALESCE(excluded.last_forwarded_hash, agents.last_forwarded_hash),
            cwd = COALESCE(excluded.cwd, agents.cwd),
            worktree = COALESCE(excluded.worktree, agents.worktree),
+           branch = COALESCE(excluded.branch, agents.branch),
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -234,6 +261,7 @@ export class TriggerStore {
         forwarded ? forwardedHash : null,
         event.cwd,
         event.worktree,
+        event.branch ?? null,
         nowIso,
       );
   }
@@ -265,6 +293,7 @@ function toEvent(row: EventRow): StoredEvent {
     text: row.text,
     cwd: row.cwd,
     worktree: row.worktree,
+    branch: row.branch,
     ts: row.ts,
     state: row.state as DeliveryState,
     attempts: row.attempts,
@@ -284,6 +313,7 @@ function toCursor(row: AgentRow): AgentCursor {
     lastForwardedStatus: (row.last_forwarded_status as ForwardStatus | null) ?? null,
     cwd: row.cwd,
     worktree: row.worktree,
+    branch: row.branch,
     updatedAt: row.updated_at,
   };
 }

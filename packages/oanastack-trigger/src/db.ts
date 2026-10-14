@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS events (
   text TEXT,
   cwd TEXT,
   worktree TEXT,
+  branch TEXT,
   ts TEXT NOT NULL,
   state TEXT NOT NULL CHECK (state IN ('pending', 'sent', 'failed', 'skipped')),
   attempts INTEGER NOT NULL DEFAULT 0,
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS agents (
   last_forwarded_hash TEXT,
   cwd TEXT,
   worktree TEXT,
+  branch TEXT,
   updated_at TEXT NOT NULL
 );
 
@@ -55,5 +57,13 @@ export function openDatabase(dbPath: string): DatabaseSync {
   db.exec("PRAGMA busy_timeout = 5000");
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(SCHEMA);
+  addColumn(db, "events", "branch");
+  addColumn(db, "agents", "branch");
   return db;
+}
+
+function addColumn(db: DatabaseSync, table: "events" | "agents", column: "branch"): void {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as Array<{ name: string }>;
+  if (rows.some((row) => row.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT`);
 }

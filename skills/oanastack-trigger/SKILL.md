@@ -63,11 +63,16 @@ watcher 在状态变化时 POST 给本地 `/v1/events`。服务只把 `done` 和
   "text": "最近输出",
   "cwd": "/work",
   "worktree": "/work/wt",
+  "branch": "feature/session-branch",
   "ts": "2026-10-14T16:18:00.000Z"
 }
 ```
 
+`trigger attach` 和 `trigger start` 会在 agent 的 cwd 或 worktree 里跑 `git rev-parse --abbrev-ref HEAD`，并用 `git rev-parse --show-toplevel` 记下 worktree 根。会话记在 `trigger.sqlite`：agent 名、kind、branch、worktree、cwd。`oanastack trigger status` 会打出这三项。每次 webhook 正文都带 `branch`、`cwd`、`worktree`。目录不是 git checkout 时 `branch` 为 null，路径仍保留。
+
 `kind` 只能是 `codex` 或 `claude`。`summary` 缺省时取 `text` 的第一行。失败写到 `~/.oanastack/trigger.log` 并按退避重试，不会把 webhook URL 或 token 写进日志。数据库是 `~/.oanastack/trigger.sqlite`（`OANASTACK_HOME` / `OANASTACK_TRIGGER_DB` 可覆盖），和进度看板的 `oanastack.sqlite` 不是同一个文件。
+
+进度看板 `packages/oanastack`（PR #14）不在这条分支上，所以这里不改看板页面。每日工作从 webhook JSON 和 `oanastack trigger status --json` 的 `.agents[]` 读 `branch` / `cwd` / `worktree`。后续再把每个 session 的 branch 画到看板和 worktree map 上。
 
 ## 不要
 

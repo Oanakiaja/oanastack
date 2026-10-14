@@ -17,6 +17,7 @@ export interface TriggerEvent {
   text: string | null;
   cwd: string | null;
   worktree: string | null;
+  branch: string | null;
   ts: string;
 }
 
@@ -39,6 +40,7 @@ export interface AgentCursor {
   lastForwardedStatus: ForwardStatus | null;
   cwd: string | null;
   worktree: string | null;
+  branch: string | null;
   updatedAt: string;
 }
 

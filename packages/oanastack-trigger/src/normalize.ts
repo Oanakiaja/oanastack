@@ -7,6 +7,7 @@ const PANE_ID = /^w\d+:p\d+$/;
 const TEXT_LIMIT = 12_000;
 const SUMMARY_LIMIT = 240;
 const PATH_LIMIT = 1024;
+const BRANCH_LIMIT = 256;
 
 export function normalizeEvent(input: unknown, now: Date = new Date()): TriggerEvent {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -33,6 +34,7 @@ export function normalizeEvent(input: unknown, now: Date = new Date()): TriggerE
     text,
     cwd: limit(optionalString(raw, "cwd"), PATH_LIMIT),
     worktree: limit(optionalString(raw, "worktree"), PATH_LIMIT),
+    branch: limit(optionalString(raw, "branch"), BRANCH_LIMIT),
     ts: parseTs(optionalString(raw, "ts"), now),
   };
 }
@@ -70,6 +72,7 @@ export function publicBody(event: TriggerEvent): {
   text: string | null;
   cwd: string | null;
   worktree: string | null;
+  branch: string | null;
   ts: string;
 } {
   return {
@@ -80,6 +83,7 @@ export function publicBody(event: TriggerEvent): {
     text: event.text,
     cwd: event.cwd,
     worktree: event.worktree,
+    branch: event.branch,
     ts: event.ts,
   };
 }

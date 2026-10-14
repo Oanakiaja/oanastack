@@ -266,10 +266,21 @@ async function supervise(
         void runWatch({
           agent: agent.name,
           kind: agent.kind ?? undefined,
+          cwd: agent.cwd,
+          worktree: agent.worktree,
           runner,
           memory: { lastStatus: null },
           intervalMs,
           signal: child.signal,
+          onSession: (place) => {
+            store.recordSession({
+              agent: agent.name ?? "",
+              kind: place.kind,
+              branch: place.branch,
+              cwd: place.cwd,
+              worktree: place.worktree,
+            });
+          },
           post: async (event) => {
             const normalized = normalizeEvent(event);
             const result = store.ingest(normalized);

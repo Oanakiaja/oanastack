@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { runWatch, seedFromStatus, watchOnce } from "../attach.js";
+import { runWatch, seedFromStatus, sessionPlace, watchOnce } from "../attach.js";
 import { fetchStatus, postTriggerEvent } from "../client.js";
 import { formatDoctor, resolveService, runDoctor } from "../doctor.js";
 import { TriggerError } from "../errors.js";
@@ -28,7 +28,9 @@ function formatStatus(status: StatusSnapshot): string {
   ];
   if (status.agents.length === 0) lines.push("no agents");
   for (const agent of status.agents) {
-    lines.push(`${agent.agent} ${agent.kind ?? "unknown"} ${agent.lastStatus ?? "unknown"}`);
+    lines.push(
+      `${agent.agent} ${agent.kind ?? "unknown"} ${agent.lastStatus ?? "unknown"} branch ${agent.branch ?? "-"} cwd ${agent.cwd ?? "-"} worktree ${agent.worktree ?? "-"}`,
+    );
   }
   if (status.lastDelivery) {
     const outcome = status.lastDelivery.ok ? "sent" : "error";
@@ -105,20 +107,35 @@ const attach = defineCommand({
     const kind = parseKind(args.kind);
     const intervalMs = parsePositive(args.interval, "interval");
     const lines = parsePositive(args.lines, "lines");
+    const io = getIo();
+    const runner = createHerdrRunner(io.env.HERDR_BIN, io.env);
+    const onSession = (place: { kind: AgentKind | null; branch: string | null; cwd: string | null; worktree: string | null }) => {
+      saveSession(io.location.dbPath, args.agent, place);
+    };
     if (args.background === true) {
+      let snap: Awaited<ReturnType<typeof runner.get>> = null;
+      try {
+        snap = await runner.get(args.agent);
+      } catch {
+        snap = null;
+      }
+      const place = sessionPlace(snap, { kind, cwd: args.cwd, worktree: args.worktree });
+      onSession(place);
       const childArgs = ["trigger", "attach", args.agent, "--interval", String(intervalMs), "--lines", String(lines)];
       if (kind) childArgs.push("--kind", kind);
       if (args.cwd) childArgs.push("--cwd", args.cwd);
       if (args.worktree) childArgs.push("--worktree", args.worktree);
       if (args["service-url"]) childArgs.push("--service-url", args["service-url"]);
       if (args.json === true) childArgs.push("--json");
-      const pid = spawnDetached(childArgs, getIo().env);
-      emit(args.json === true, { agent: args.agent, pid, attached: true }, `attached ${args.agent} pid ${pid}`);
+      const pid = spawnDetached(childArgs, io.env);
+      emit(
+        args.json === true,
+        { agent: args.agent, pid, attached: true, branch: place.branch, cwd: place.cwd, worktree: place.worktree },
+        `attached ${args.agent} pid ${pid} branch ${place.branch ?? "-"}`,
+      );
       return;
     }
-    const io = getIo();
     const serviceUrl = (args["service-url"] ?? defaultServiceUrl(io.env)).replace(/\/$/, "");
-    const runner = createHerdrRunner(io.env.HERDR_BIN, io.env);
     const remote = await fetchStatus(serviceUrl);
     let memory = remote ? seedFromStatus(remote, args.agent) : { lastStatus: null };
     const post = async (event: Record<string, unknown>) => {
@@ -136,6 +153,7 @@ const attach = defineCommand({
         lines,
         cwd: args.cwd,
         worktree: args.worktree,
+        onSession,
       });
       if (!tick.posted && args.json === true) {
         io.stdout(JSON.stringify({ agent: args.agent, posted: false, status: tick.snapshot?.status ?? null }));
@@ -158,6 +176,7 @@ const attach = defineCommand({
         cwd: args.cwd,
         worktree: args.worktree,
         signal: abort.signal,
+        onSession,
       });
     } finally {
       process.off("SIGINT", stop);
@@ -252,9 +271,25 @@ export async function runStartCli(argv: string[]): Promise<void> {
       started: result.started,
       attached: result.attached,
       service: result.service,
+      branch: result.branch,
+      cwd: result.cwd,
+      worktree: result.worktree,
     },
-    `started ${args.agent} ${args.kind}${result.attached ? " attached" : ""}`,
+    `started ${args.agent} ${args.kind} branch ${result.branch ?? "-"}${result.attached ? " attached" : ""}`,
   );
+}
+
+function saveSession(
+  dbPath: string,
+  agent: string,
+  place: { kind: AgentKind | null; branch: string | null; cwd: string | null; worktree: string | null },
+): void {
+  const store = new TriggerStore(dbPath);
+  try {
+    store.recordSession({ agent, ...place });
+  } finally {
+    store.close();
+  }
 }
 
 function parseKind(value: string | undefined): AgentKind | undefined {

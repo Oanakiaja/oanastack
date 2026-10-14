@@ -32,10 +32,17 @@ while true; do
     fi
     CWD=$(printf '%s' "$RAW" | jq -r '.result.agent.cwd // .result.agent.foreground_cwd // empty' 2>/dev/null || true)
     WT=$(printf '%s' "$RAW" | jq -r 'if (.result.agent.worktree | type) == "string" then .result.agent.worktree elif (.result.agent.worktree.path? | type) == "string" then .result.agent.worktree.path else "" end' 2>/dev/null || true)
+    BRANCH=""
+    PROBE="${WT:-$CWD}"
+    if [ -n "$PROBE" ] && command -v git >/dev/null 2>&1; then
+      BRANCH=$(git -C "$PROBE" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+      TOP=$(git -C "$PROBE" rev-parse --show-toplevel 2>/dev/null || true)
+      [ -n "$TOP" ] && WT="$TOP"
+    fi
     if jq -n \
       --arg a "$AGENT" --arg k "$KIND" --arg s "$S" --arg t "$TEXT" \
-      --arg c "$CWD" --arg w "$WT" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      '{agent:$a,kind:$k,status:$s,text:$t,summary:($t|split("\n")[0]),cwd:$c,worktree:$w,ts:$ts}' \
+      --arg c "$CWD" --arg w "$WT" --arg b "$BRANCH" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      '{agent:$a,kind:$k,status:$s,text:$t,summary:($t|split("\n")[0]),cwd:$c,worktree:$w,branch:$b,ts:$ts}' \
       | curl -sfS -X POST "$BASE/v1/events" -H 'content-type: application/json' --data @-; then
       echo "$(date) queued $AGENT $S"
       LAST=$S

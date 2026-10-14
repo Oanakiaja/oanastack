@@ -49,10 +49,17 @@ Event JSON, both on the loopback service and on the webhook:
   "text": "shipped the trigger",
   "cwd": "/work",
   "worktree": "/work/wt",
+  "branch": "feature/session-branch",
   "ts": "2026-10-14T16:18:00.000Z"
 }
 ```
 
 `kind` is `codex` or `claude`. `status` on the wire to Grok Bot is only `done` or `blocked`. Other herdr statuses update the agent cursor so the next terminal status posts again, even when the text matches. A repeat of the same terminal status does not post twice.
+
+`trigger attach` and `trigger start` resolve the git branch with `git rev-parse --abbrev-ref HEAD` in the agent cwd or worktree, and the worktree root with `git rev-parse --show-toplevel`. That session (`agent`, `kind`, `branch`, `cwd`, `worktree`) is stored in `trigger.sqlite` and printed by `oanastack trigger status`. Every webhook body includes `branch`, `cwd`, and `worktree`.
+
+## Dashboard
+
+The progress board in `packages/oanastack` (PR #14) is not on this branch, so this change does not draw the branch on that page. Daily work should read `branch`, `cwd`, and `worktree` from the webhook JSON and from `oanastack trigger status --json` (`.agents[]`). Follow-up: show each session's branch on the board and worktree map once that package lands.
 
 Stack: `node:sqlite`, [citty](https://github.com/unjs/citty), Hono on loopback. Webhook URL and `Authorization` never go to stdout, status, doctor, or the delivery log.

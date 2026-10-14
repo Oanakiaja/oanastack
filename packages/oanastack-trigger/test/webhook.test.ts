@@ -31,6 +31,7 @@ describe("trigger delivery", () => {
         text: "shipped the trigger",
         cwd: "/work",
         worktree: "/work/wt",
+        branch: "feature/trigger",
         ts: "2026-10-14T16:18:00.000Z",
       };
       const first = await fetch(`${running.url}/v1/events`, {
@@ -69,8 +70,12 @@ describe("trigger delivery", () => {
         text: "shipped the trigger",
         cwd: "/work",
         worktree: "/work/wt",
+        branch: "feature/trigger",
         ts: "2026-10-14T16:18:00.000Z",
       });
+      expect(hook.hits[0]?.body).toHaveProperty("branch");
+      expect(hook.hits[0]?.body).toHaveProperty("cwd");
+      expect(hook.hits[0]?.body).toHaveProperty("worktree");
       expect(hook.hits[1]?.body).toMatchObject({ status: "blocked", summary: "approve git push" });
       expect(JSON.stringify(hook.hits)).not.toContain("GROKBOT");
     } finally {
@@ -95,6 +100,7 @@ describe("trigger delivery", () => {
         text: "done",
         cwd: null,
         worktree: null,
+        branch: null,
         ts: "2026-10-14T16:18:00.000Z",
       });
       expect(ingest.id).not.toBeNull();

@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
+import { sessionPlace } from "./attach.js";
 import { TriggerError } from "./errors.js";
 import { createHerdrRunner, herdrStarted, type HerdrRunner } from "./herdr.js";
-import { defaultServiceUrl } from "./paths.js";
+import { resolveTriggerLocation, defaultServiceUrl } from "./paths.js";
 import { probeService } from "./server.js";
-import type { AgentKind } from "./types.js";
+import { TriggerStore } from "./store.js";
+import type { AgentKind, HerdrSnapshot } from "./types.js";
 import { herdrStartArgs, type HerdrStartSpec } from "./yolo.js";
 
 export interface StartArgs {
@@ -122,7 +124,15 @@ export async function runAgentStart(options: {
   spawnServe?: () => number;
   spawnAttach?: (agent: string, kind: AgentKind) => number;
   fetchImpl?: typeof fetch;
-}): Promise<{ herdrArgs: string[]; started: boolean; attached: boolean; service: string | null }> {
+}): Promise<{
+  herdrArgs: string[];
+  started: boolean;
+  attached: boolean;
+  service: string | null;
+  branch: string | null;
+  cwd: string | null;
+  worktree: string | null;
+}> {
   const env = options.env ?? process.env;
   const args = options.args;
   const spec: HerdrStartSpec = {
@@ -151,6 +161,25 @@ export async function runAgentStart(options: {
     const detail = (result.stderr || result.stdout || "herdr agent start failed").trim();
     throw new TriggerError(detail, "unavailable");
   }
+  let snap: HerdrSnapshot | null = null;
+  try {
+    snap = await runner.get(args.agent);
+  } catch {
+    snap = null;
+  }
+  const place = sessionPlace(snap, { kind: args.kind, cwd: args.cwd, worktree: args.worktree });
+  const store = new TriggerStore(resolveTriggerLocation(env).dbPath);
+  try {
+    store.recordSession({
+      agent: args.agent,
+      kind: place.kind ?? args.kind,
+      branch: place.branch,
+      cwd: place.cwd,
+      worktree: place.worktree,
+    });
+  } finally {
+    store.close();
+  }
   let attached = false;
   if (args.attach) {
     const spawnAttach =
@@ -164,5 +193,13 @@ export async function runAgentStart(options: {
     spawnAttach(args.agent, args.kind);
     attached = true;
   }
-  return { herdrArgs, started, attached, service: args.serve ? serviceUrl : null };
+  return {
+    herdrArgs,
+    started,
+    attached,
+    service: args.serve ? serviceUrl : null,
+    branch: place.branch,
+    cwd: place.cwd,
+    worktree: place.worktree,
+  };
 }
