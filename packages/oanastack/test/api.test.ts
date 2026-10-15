@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -120,6 +121,32 @@ describe("api", () => {
     expect(body.parent).toBeTruthy();
     const relative = await app.request("/api/browse?path=relative");
     expect(relative.status).toBe(400);
+    store.close();
+  });
+
+  it("reads the default branch of a repo path without registering it", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "oanastack-base-"));
+    const billing = path.join(root, "billing");
+    mkdirSync(billing);
+    const git = (args: string[]) => {
+      const result = spawnSync("git", args, { cwd: billing, encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+    };
+    git(["init", "-b", "main"]);
+    git(["config", "user.email", "test@example.com"]);
+    git(["config", "user.name", "oanastack test"]);
+    writeFileSync(path.join(billing, "README.md"), "hi\n");
+    git(["add", "README.md"]);
+    git(["commit", "-m", "init"]);
+    const store = openStore(path.join(root, "oanastack.sqlite"));
+    const app = createApp(store, { webRoot: null });
+    const found = await app.request(`/api/repo-base?path=${encodeURIComponent(billing)}`);
+    expect(found.status).toBe(200);
+    expect(await found.json()).toMatchObject({ defaultBranch: "main" });
+    const relative = await app.request("/api/repo-base?path=relative");
+    expect(relative.status).toBe(400);
+    const missing = await app.request(`/api/repo-base?path=${encodeURIComponent(path.join(root, "nope"))}`);
+    expect(missing.status).toBe(400);
     store.close();
   });
 

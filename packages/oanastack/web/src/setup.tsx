@@ -1,14 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-interface RepoInfo {
-  id: number;
-  name: string;
-  path: string;
-  testCommand: string | null;
-  defaultBranch: string;
-  branches: string[];
-}
-
 interface BrowseResult {
   path: string;
   parent: string | null;
@@ -25,57 +16,44 @@ async function errorText(response: Response): Promise<string> {
   }
 }
 
-export function ProjectForm({ onDone, onError }: { onDone: (slug: string) => void; onError: (message: string) => void }) {
-  const [slug, setSlug] = useState("");
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, name: name || undefined }),
-      });
-      if (!response.ok) throw new Error(await errorText(response));
-      const created = (await response.json()) as { slug: string };
-      setSlug("");
-      setName("");
-      onDone(created.slug);
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "无法添加项目");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <details className="stack-form">
-      <summary>新建项目</summary>
-      <form onSubmit={(event) => void submit(event)}>
-        <label>
-          slug
-          <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="billing-api" required />
-        </label>
-        <label>
-          名称
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Billing API" />
-        </label>
-        <button className="chip" type="submit" disabled={busy}>添加项目</button>
-      </form>
-    </details>
-  );
-}
-
 export function RepoForm({ onDone, onError }: { onDone: () => void; onError: (message: string) => void }) {
   const [name, setName] = useState("");
   const [repoPath, setRepoPath] = useState("");
-  const [testCommand, setTestCommand] = useState("");
+  const [baseBranch, setBaseBranch] = useState<string | null>(null);
+  const [baseNote, setBaseNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [browse, setBrowse] = useState<BrowseResult | null>(null);
   const [browseError, setBrowseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!repoPath.startsWith("/")) {
+      setBaseBranch(null);
+      setBaseNote(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/repo-base?path=${encodeURIComponent(repoPath)}`)
+        .then(async (response) => {
+          if (!response.ok) throw new Error(await errorText(response));
+          return (await response.json()) as { defaultBranch: string };
+        })
+        .then((body) => {
+          if (cancelled) return;
+          setBaseBranch(body.defaultBranch);
+          setBaseNote(null);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setBaseBranch(null);
+          setBaseNote("这个路径还不是 git 仓库");
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [repoPath]);
 
   async function openBrowse(nextPath: string) {
     setBrowseError(null);
@@ -96,12 +74,13 @@ export function RepoForm({ onDone, onError }: { onDone: () => void; onError: (me
       const response = await fetch("/api/repos", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, path: repoPath, testCommand: testCommand || undefined }),
+        body: JSON.stringify({ name, path: repoPath }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       setName("");
       setRepoPath("");
-      setTestCommand("");
+      setBaseBranch(null);
+      setBaseNote(null);
       setBrowse(null);
       onDone();
     } catch (err) {
@@ -149,128 +128,9 @@ export function RepoForm({ onDone, onError }: { onDone: () => void; onError: (me
           </div>
         ) : null}
         {browseError ? <p className="muted">{browseError}</p> : null}
-        <label>
-          test 命令
-          <input value={testCommand} onChange={(event) => setTestCommand(event.target.value)} placeholder="npm test" />
-        </label>
+        {baseBranch ? <p className="muted">主分支 <span className="mono">{baseBranch}</span></p> : null}
+        {baseNote ? <p className="muted">{baseNote}</p> : null}
         <button className="chip" type="submit" disabled={busy}>登记</button>
-      </form>
-    </details>
-  );
-}
-
-export function FeatureForm({
-  project,
-  onDone,
-  onError,
-}: {
-  project: string;
-  onDone: (slug: string) => void;
-  onError: (message: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [slug, setSlug] = useState("");
-  const [goal, setGoal] = useState("");
-  const [catalog, setCatalog] = useState<RepoInfo[]>([]);
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const [bases, setBases] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void fetch("/api/repos")
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await errorText(response));
-        return (await response.json()) as RepoInfo[];
-      })
-      .then((repos) => {
-        if (cancelled) return;
-        setCatalog(repos);
-        setBases((current) => {
-          const next = { ...current };
-          for (const repo of repos) {
-            if (!next[repo.name]) next[repo.name] = repo.defaultBranch;
-          }
-          return next;
-        });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) onError(err instanceof Error ? err.message : "无法读取 repo");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, onError]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const repos = catalog
-      .filter((repo) => picked[repo.name])
-      .map((repo) => ({ name: repo.name, base: bases[repo.name] || repo.defaultBranch }));
-    if (repos.length === 0) {
-      onError("至少选择一个 repo，并填写 base branch");
-      return;
-    }
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(project)}/features`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, goal: goal || undefined, repos }),
-      });
-      if (!response.ok) throw new Error(await errorText(response));
-      const created = (await response.json()) as { slug: string };
-      setSlug("");
-      setGoal("");
-      setPicked({});
-      onDone(created.slug);
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "无法创建 feature");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <details className="stack-form" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>新建 feature</summary>
-      <form onSubmit={(event) => void submit(event)}>
-        <label>
-          slug
-          <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="charge-keys" required />
-        </label>
-        <label>
-          目标
-          <input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="One charge per checkout" />
-        </label>
-        {catalog.length === 0 ? <p className="muted">先登记 repo，再创建 feature。</p> : null}
-        {catalog.map((repo) => (
-          <div key={repo.id} className="repo-choice">
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={picked[repo.name] === true}
-                onChange={(event) => setPicked((current) => ({ ...current, [repo.name]: event.target.checked }))}
-              />
-              {repo.name}
-            </label>
-            <label>
-              base branch
-              <input
-                value={bases[repo.name] ?? repo.defaultBranch}
-                list={`bases-${repo.id}`}
-                onChange={(event) => setBases((current) => ({ ...current, [repo.name]: event.target.value }))}
-              />
-              <datalist id={`bases-${repo.id}`}>
-                {repo.branches.map((branch) => (
-                  <option key={branch} value={branch} />
-                ))}
-              </datalist>
-            </label>
-          </div>
-        ))}
-        <button className="chip" type="submit" disabled={busy || !project}>创建 feature</button>
       </form>
     </details>
   );

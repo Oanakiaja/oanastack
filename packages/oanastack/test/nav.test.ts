@@ -4,7 +4,7 @@ import { highlightCode } from "../web/src/code-highlight";
 import { iconKind, languageOf } from "../web/src/file-kind";
 import { featureLabel, targetLabel } from "../web/src/labels";
 import { statusMark } from "../web/src/status-mark";
-import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "../web/src/nav-tree";
+import { distanceText, featureTree, groupByBase, worktreeName, type WorktreeNode } from "../web/src/nav-tree";
 import { parseHash, projectHash, worktreeHash } from "../web/src/route";
 
 function boardTarget(input: {
@@ -83,6 +83,34 @@ describe("dashboard navigation", () => {
     expect(worktreeName(billing, shared)).toBe("billing · charge-keys");
     expect(distanceText(2, 1)).toBe("领先 2 · 落后 1");
     expect(distanceText(null, 0)).toBeNull();
+  });
+
+  it("nests features under the base branch, then under the feature they branched from", () => {
+    const billing = node({ repoName: "billing", baseBranch: "main", featureSlug: "charge-keys", ahead: 2, behind: 1 });
+    const ledger = node({ repoName: "ledger", baseBranch: "main", featureSlug: "charge-keys", ahead: 1, behind: 0 });
+    const nested = node({
+      repoName: "billing",
+      baseBranch: "feature/charge-keys",
+      featureSlug: "retry",
+      branch: "feature/retry",
+    });
+    const deeper = node({
+      repoName: "billing",
+      baseBranch: "feature/retry",
+      featureSlug: "polish",
+      branch: "feature/polish",
+    });
+    const other = node({ repoName: "notify", baseBranch: "develop", featureSlug: "inbox", branch: "feature/inbox" });
+    const roots = featureTree([deeper, other, nested, ledger, billing]);
+    expect(roots.map((root) => root.baseBranch)).toEqual(["develop", "main"]);
+    expect(roots[0]?.features.map((feature) => feature.slug)).toEqual(["inbox"]);
+    const charge = roots[1]?.features[0];
+    expect(charge?.slug).toBe("charge-keys");
+    expect(charge?.branch).toBe("feature/charge-keys");
+    expect(charge?.repos.map((repo) => repo.repoName)).toEqual(["billing", "ledger"]);
+    expect(charge?.children.map((feature) => feature.slug)).toEqual(["retry"]);
+    expect(charge?.children[0]?.children.map((feature) => feature.slug)).toEqual(["polish"]);
+    expect(charge?.children[0]?.repos.map((repo) => repo.repoName)).toEqual(["billing"]);
   });
 
   it("reads the overview hash and the worktree hash", () => {

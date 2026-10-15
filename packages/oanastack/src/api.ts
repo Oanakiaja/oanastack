@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { StoreError } from "./errors.js";
-import { headSha, listBranches, recentCommits } from "./git.js";
+import { defaultBranch, gitTopLevel, headSha, listBranches, recentCommits } from "./git.js";
 import { diffWorktree, measureWorktree, type WorktreeDiff } from "./git-stats.js";
 import type { Store } from "./store.js";
 import { onWorktree, taskRanges, type TaskRange } from "./task-range.js";
@@ -38,6 +38,13 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
   app.get("/api/overview", (c) => c.json(store.overview()));
   app.get("/api/browse", (c) => c.json(browseDirectories(c.req.query("path") ?? "")));
   app.get("/api/repos", (c) => c.json(repoCatalog(store)));
+  app.get("/api/repo-base", (c) => {
+    const raw = c.req.query("path")?.trim() ?? "";
+    if (!path.isAbsolute(raw)) throw new StoreError("path must be absolute", "invalid");
+    const top = gitTopLevel(raw);
+    if (!top) throw new StoreError("not a git repo", "invalid");
+    return c.json({ path: top, defaultBranch: defaultBranch(top) });
+  });
   app.post("/api/repos", async (c) => {
     const body = await readJson(c);
     const repo = registerRepo(store, {

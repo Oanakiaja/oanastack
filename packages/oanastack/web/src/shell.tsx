@@ -7,9 +7,9 @@ import { DragBar } from "./drag-bar";
 import { MID_WIDTH, NAV_WIDTH, TREE_WIDTH, useStoredNumber } from "./layout-pref";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
-import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "./nav-tree";
+import { distanceText, featureTree, type FeatureNode, type WorktreeNode } from "./nav-tree";
 import { projectHash, worktreeHash } from "./route";
-import { FeatureForm, ProjectForm, RepoForm } from "./setup";
+import { RepoForm } from "./setup";
 
 export function Shell({
   overview,
@@ -52,7 +52,7 @@ export function Shell({
       <section className="pane nav-pane" aria-label="项目">
         <h2>项目</h2>
         {overview && overview.projects.length === 0 ? (
-          <p className="muted">还没有项目。登记 repo，添加项目，再创建 feature。</p>
+          <p className="muted">还没有项目。用 CLI 添加项目和 feature。这里只登记 repo。</p>
         ) : null}
         <ul className="nav-tree">
           {overview?.projects.map((item) => (
@@ -66,14 +66,6 @@ export function Shell({
             />
           ))}
         </ul>
-        <ProjectForm
-          onError={onError}
-          onDone={(slug) => {
-            onError(null);
-            window.location.hash = projectHash(slug);
-            void onReload();
-          }}
-        />
         <RepoForm
           onError={onError}
           onDone={() => {
@@ -101,15 +93,13 @@ export function Shell({
           onMidWidth={setMidWidth}
           treeWidth={treeWidth}
           onTreeWidth={setTreeWidth}
-          onError={onError}
-          onReload={onReload}
         />
       ) : (
         <section className="pane overview-pane" aria-label={project ? "汇总" : "总看板"}>
           {!overview ? (
             <p className="muted">读取中</p>
           ) : project ? (
-            <ProjectOverview project={project} onError={onError} onReload={onReload} />
+            <ProjectOverview project={project} />
           ) : home ? (
             <GlobalBoard projects={overview.projects} />
           ) : (
@@ -145,26 +135,37 @@ function ProjectBranch({
       behind: distances[distanceKey(feature.slug, repo.name)]?.behind ?? null,
     })),
   );
-  const groups = groupByBase(nodes);
+  const roots = featureTree(nodes);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
+
+  function toggle(slug: string) {
+    setClosed((current) => {
+      const next = new Set(current);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
 
   return (
     <li>
       <a className={selected ? "nav-row nav-project selected" : "nav-row nav-project"} href={projectHash(project.slug)}>
         <span className="name">{project.name}</span>
       </a>
-      {groups.map((group) => (
-        <div key={group.baseBranch} className="nav-base">
-          <p className="nav-base-name"><span className="mono">{group.baseBranch}</span></p>
+      {roots.map((root) => (
+        <div key={root.baseBranch} className="nav-base">
+          <p className="nav-base-name"><span className="mono">{root.baseBranch}</span></p>
           <ul>
-            {group.worktrees.map((node) => (
-              <li key={`${node.featureSlug}:${node.repoName}`}>
-                <WorktreeRow
-                  project={project.slug}
-                  node={node}
-                  siblings={group.worktrees}
-                  selected={node.featureSlug === activeFeature && node.repoName === activeRepo}
-                />
-              </li>
+            {root.features.map((feature) => (
+              <FeatureBranch
+                key={feature.slug}
+                project={project.slug}
+                feature={feature}
+                closed={closed}
+                onToggle={toggle}
+                activeFeature={activeFeature}
+                activeRepo={activeRepo}
+              />
             ))}
           </ul>
         </div>
@@ -173,15 +174,66 @@ function ProjectBranch({
   );
 }
 
+function FeatureBranch({
+  project,
+  feature,
+  closed,
+  onToggle,
+  activeFeature,
+  activeRepo,
+}: {
+  project: string;
+  feature: FeatureNode;
+  closed: ReadonlySet<string>;
+  onToggle: (slug: string) => void;
+  activeFeature?: string;
+  activeRepo?: string;
+}) {
+  const open = !closed.has(feature.slug);
+  return (
+    <li>
+      <div className="nav-feature">
+        <button type="button" className="nav-twist" aria-expanded={open} aria-label={feature.branch} onClick={() => onToggle(feature.slug)}>
+          {open ? "▼" : "▶"}
+        </button>
+        <span className="name">{feature.branch}</span>
+        <StatusPill kind="feature" status={feature.status} />
+      </div>
+      {open ? (
+        <ul className="nav-children">
+          {feature.repos.map((node) => (
+            <li key={node.repoName}>
+              <WorktreeRow
+                project={project}
+                node={node}
+                selected={node.featureSlug === activeFeature && node.repoName === activeRepo}
+              />
+            </li>
+          ))}
+          {feature.children.map((child) => (
+            <FeatureBranch
+              key={child.slug}
+              project={project}
+              feature={child}
+              closed={closed}
+              onToggle={onToggle}
+              activeFeature={activeFeature}
+              activeRepo={activeRepo}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
 function WorktreeRow({
   project,
   node,
-  siblings,
   selected,
 }: {
   project: string;
   node: WorktreeNode;
-  siblings: WorktreeNode[];
   selected: boolean;
 }) {
   const distance = distanceText(node.ahead, node.behind);
@@ -191,8 +243,7 @@ function WorktreeRow({
       href={worktreeHash(project, node.featureSlug, node.repoName)}
       aria-current={selected ? "true" : undefined}
     >
-      <span className="name">{worktreeName(node, siblings)}</span>
-      <StatusPill kind="feature" status={node.featureStatus} />
+      <span className="name">{node.repoName}</span>
       {distance ? <span className="dist">{distance}</span> : null}
     </a>
   );
@@ -203,7 +254,7 @@ function GlobalBoard({ projects }: { projects: Project[] }) {
     return (
       <>
         <h2>总看板</h2>
-        <p className="muted">还没有项目。登记 repo，添加项目，再创建 feature。</p>
+        <p className="muted">还没有项目。用 CLI 添加项目和 feature。页面只预览。</p>
       </>
     );
   }
@@ -286,15 +337,7 @@ function GlobalBoard({ projects }: { projects: Project[] }) {
   );
 }
 
-function ProjectOverview({
-  project,
-  onError,
-  onReload,
-}: {
-  project: Project | undefined;
-  onError: (message: string | null) => void;
-  onReload: () => Promise<void>;
-}) {
+function ProjectOverview({ project }: { project: Project | undefined }) {
   const unlinked = project?.targets.filter((item) => item.featureId === null) ?? [];
   return (
     <>
@@ -303,14 +346,6 @@ function ProjectOverview({
         <>
           {project.note ? <p className="muted">{project.note}</p> : null}
           <Rollup project={project} />
-          <FeatureForm
-            project={project.slug}
-            onError={onError}
-            onDone={() => {
-              onError(null);
-              void onReload();
-            }}
-          />
           {unlinked.length > 0 ? (
             <>
               <h3>未关联 feature</h3>
@@ -339,8 +374,6 @@ function WorktreeDetail({
   onMidWidth,
   treeWidth,
   onTreeWidth,
-  onError,
-  onReload,
 }: {
   project: Project;
   feature: Feature;
@@ -351,10 +384,7 @@ function WorktreeDetail({
   onMidWidth: (next: number) => void;
   treeWidth: number;
   onTreeWidth: (next: number) => void;
-  onError: (message: string | null) => void;
-  onReload: () => Promise<void>;
 }) {
-  const [busy, setBusy] = useState(false);
   const targets = onWorktree(
     project.targets.filter((item) => item.featureId === feature.id),
     repo,
@@ -362,33 +392,6 @@ function WorktreeDetail({
   ).sort(compareTaskOrder);
   const ranges = taskRanges(targets, repo.baseBranch);
   const away = distanceText(distance?.ahead ?? null, distance?.behind ?? null);
-  const actionable = feature.status === "open" || feature.status === "review";
-
-  async function act(kind: "merge" | "merge-local" | "close" | "abandon") {
-    if (kind === "close" && !window.confirm("关闭此 feature？每个 worktree 已 merge 且干净后才会移除。")) return;
-    if (kind === "abandon" && !window.confirm("放弃此 feature？未 merge 的 branch 会被删除，worktree 会移除。")) return;
-    setBusy(true);
-    try {
-      const closing = kind === "close" || kind === "abandon";
-      const url = `/api/projects/${encodeURIComponent(feature.projectSlug)}/features/${encodeURIComponent(feature.slug)}/${closing ? "close" : "merge"}`;
-      const body = kind === "abandon" ? { abandon: true } : kind === "merge-local" ? { local: true } : {};
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? `HTTP ${response.status}`);
-      }
-      onError(null);
-      await onReload();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "请求失败");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <DiffColumns
@@ -412,18 +415,10 @@ function WorktreeDetail({
             </p>
             <p className="mono">{repo.baseBranch} → {repo.branch}</p>
             {away ? <p className="mono">{away}</p> : null}
-            {feature.goal ? <p className="muted">{feature.goal}</p> : null}
-            {repo.prUrl ? <p><a href={repo.prUrl}>PR</a></p> : null}
-          </header>
-          {actionable ? (
-            <div className="feature-actions">
-              <button className="chip" type="button" disabled={busy} onClick={() => void act("merge-local")}>本地 merge</button>
-              <button className="chip" type="button" disabled={busy} onClick={() => void act("merge")}>merge</button>
-              <button className="chip" type="button" disabled={busy} onClick={() => void act("close")}>关闭</button>
-              <button className="chip" type="button" disabled={busy} onClick={() => void act("abandon")}>放弃</button>
-            </div>
-          ) : null}
-          <RoundList rounds={repo.rounds} />
+          {feature.goal ? <p className="muted">{feature.goal}</p> : null}
+          {repo.prUrl ? <p><a href={repo.prUrl}>PR</a></p> : null}
+        </header>
+        <RoundList rounds={repo.rounds} />
           {targets.length === 0 ? <p className="muted">还没有 target。</p> : null}
           <ul className="target-list">
             {targets.map((target) => (

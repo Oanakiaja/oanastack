@@ -237,6 +237,21 @@ body.dragging-split { cursor: col-resize; user-select: none; }
 .nav-row.selected { background: var(--soft); }
 .nav-base { margin: 0 0 4px 8px; padding-left: 8px; border-left: 1px solid var(--line); }
 .nav-base-name { margin: 4px 0 1px; color: var(--muted); }
+.nav-feature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+}
+.nav-feature .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.nav-twist { width: 1.2em; color: var(--muted); flex: none; }
+.nav-children { margin: 0 0 2px 14px; padding-left: 8px; border-left: 1px solid var(--line); }
 .nav-row .name {
   min-width: 0;
   overflow: hidden;
