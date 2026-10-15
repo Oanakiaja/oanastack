@@ -15,5 +15,5 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "../src/types.ts", "../src/diff-tree.ts"]
+  "include": ["src", "../src/types.ts", "../src/diff-tree.ts", "../src/task-range.ts"]
 }

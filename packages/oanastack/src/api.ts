@@ -4,9 +4,11 @@ import { fileURLToPath } from "node:url";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { StoreError } from "./errors.js";
-import { diffWorktree, measureWorktree } from "./git-stats.js";
+import { headSha } from "./git.js";
+import { diffWorktree, measureWorktree, type WorktreeDiff } from "./git-stats.js";
 import type { Store } from "./store.js";
-import type { ResultStatus } from "./types.js";
+import { onWorktree, taskRanges, type TaskRange } from "./task-range.js";
+import type { Feature, FeatureRepoLink, ResultStatus, Target } from "./types.js";
 import { browseDirectories, closeFeature, createFeature, mergeFeature, registerRepo, repoCatalog, syncFeatureContext } from "./workspace.js";
 
 export function resolveWebRoot(moduleUrl: string = import.meta.url): string | null {
@@ -92,18 +94,23 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
     if (dir && (dir.startsWith("/") || dir.split("/").includes(".."))) {
       throw new StoreError("dir must be a relative path inside the diff", "invalid");
     }
-    return c.json(
-      diffWorktree(
-        {
-          repoPath: repo.path,
-          worktreePath: repo.worktreePath,
-          baseBranch: repo.baseBranch,
-          branch: repo.branch,
-        },
-        file || undefined,
-        { all: c.req.query("all") === "1", dir: dir || undefined },
-      ),
-    );
+    const scope = { all: c.req.query("all") === "1", dir: dir || undefined };
+    const targetId = targetQuery(c.req.query("target"));
+    if (targetId === null) {
+      return c.json(
+        diffWorktree(
+          {
+            repoPath: repo.path,
+            worktreePath: repo.worktreePath,
+            baseBranch: repo.baseBranch,
+            branch: repo.branch,
+          },
+          file || undefined,
+          scope,
+        ),
+      );
+    }
+    return c.json(diffForTarget(feature, repo, targetId, file || undefined, scope));
   });
   app.get("/api/projects/:slug/features/:feature/repos/:repo/rounds", (c) => {
     const feature = store.getFeature(c.req.param("slug"), c.req.param("feature"));
@@ -157,34 +164,42 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
   });
   app.post("/api/projects/:slug/targets", async (c) => {
     const body = await readJson(c);
-    const target = store.addTarget({
+    const created = store.addTarget({
       project: c.req.param("slug"),
       title: requireString(body, "title"),
       worktreePath: optionalString(body, "worktreePath"),
       branch: optionalString(body, "branch"),
       feature: optionalString(body, "feature"),
       repo: optionalString(body, "repo"),
+      startSha: optionalString(body, "startSha"),
     });
+    const target = created.startSha ? created : rememberSha(store, created, "start");
     if (target.featureId !== null) syncFeatureContext(store, target.featureId);
     return c.json(target, 201);
   });
   app.get("/api/targets/:id", (c) => c.json(store.getTarget(idParam(c.req.param("id")))));
   app.post("/api/targets/:id/result", async (c) => {
     const body = await readJson(c);
-    const target = store.setResult(idParam(c.req.param("id")), {
+    const id = idParam(c.req.param("id"));
+    const current = store.getTarget(id);
+    const explicitEnd = optionalString(body, "endSha");
+    const target = store.setResult(id, {
       status: requireString(body, "status") as ResultStatus,
       summary: optionalString(body, "summary"),
       worktreePath: optionalString(body, "worktreePath"),
       branch: optionalString(body, "branch"),
       herdrStatus: optionalString(body, "herdrStatus"),
       herdrResult: optionalString(body, "herdrResult"),
+      endSha: explicitEnd ?? headSha(optionalString(body, "worktreePath") ?? current.worktreePath) ?? undefined,
     });
     if (target.featureId !== null) syncFeatureContext(store, target.featureId);
     return c.json(target);
   });
   app.post("/api/targets/:id/completions", async (c) => {
     const body = await readJson(c);
-    const completion = store.addCompletion(idParam(c.req.param("id")), {
+    const id = idParam(c.req.param("id"));
+    rememberSha(store, store.getTarget(id), "end");
+    const completion = store.addCompletion(id, {
       changed: requireString(body, "changed"),
       why: requireString(body, "why"),
       verified: requireString(body, "verified"),
@@ -219,6 +234,61 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
   });
 
   return app;
+}
+
+function targetQuery(raw: string | undefined): number | null {
+  if (!raw) return null;
+  if (!/^[1-9]\d*$/.test(raw)) throw new StoreError("target must be a positive integer", "invalid");
+  return Number(raw);
+}
+
+function rememberSha(store: Store, target: Target, field: "start" | "end"): Target {
+  const sha = headSha(target.worktreePath);
+  if (!sha) return target;
+  return field === "start" ? store.setTargetShas(target.id, { startSha: sha }) : store.setTargetShas(target.id, { endSha: sha });
+}
+
+function diffForTarget(
+  feature: Feature,
+  repo: FeatureRepoLink,
+  targetId: number,
+  file: string | undefined,
+  scope: { all?: boolean; dir?: string },
+): WorktreeDiff & { range: TaskRange } {
+  const linked = onWorktree(feature.targets, repo, feature.repos.length);
+  const ranges = taskRanges(linked, repo.baseBranch);
+  const range = ranges.find((item) => item.id === targetId);
+  if (!range) throw new StoreError(`target not on this worktree: ${targetId}`, "not_found");
+  if (!range.ready || !range.fromRef || !range.toRef) {
+    return { ...emptyDiff(range.fromRef ?? repo.baseBranch, range.toRef ?? ""), range };
+  }
+  const diff = diffWorktree(
+    {
+      repoPath: repo.path,
+      worktreePath: repo.worktreePath,
+      baseBranch: repo.baseBranch,
+      branch: repo.branch,
+    },
+    file,
+    { ...scope, span: { fromRef: range.fromRef, toRef: range.toRef, live: range.live } },
+  );
+  return { ...diff, range };
+}
+
+function emptyDiff(base: string, head: string): WorktreeDiff {
+  return {
+    base,
+    head,
+    dirty: false,
+    files: [],
+    sections: [],
+    sectionsTruncated: false,
+    file: null,
+    binary: false,
+    truncated: false,
+    rows: [],
+    error: null,
+  };
 }
 
 async function readJson(c: { req: { text: () => Promise<string> } }): Promise<Record<string, unknown>> {

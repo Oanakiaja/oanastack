@@ -188,4 +188,107 @@ describe("worktree diff", () => {
     expect(escaped.status).toBe(400);
     store.close();
   });
+
+  it("records worktree HEAD and returns an incremental diff between targets", async () => {
+    const root = tempDir();
+    const billing = path.join(root, "src", "billing");
+    initRepo(billing);
+    const store = openStore(path.join(root, "oanastack.sqlite"));
+    registerRepo(store, { name: "billing", path: billing });
+    store.addProject({ slug: "billing-api", name: "Billing API" });
+    createFeature(store, store.root, {
+      project: "billing-api",
+      slug: "charge-keys",
+      repos: [{ name: "billing", base: "main" }],
+    });
+    const worktree = path.join(root, "projects", "billing-api", "features", "charge-keys", "billing");
+    const app = createApp(store, { webRoot: null });
+
+    const first = await app.request("/api/projects/billing-api/targets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "add a", feature: "charge-keys", repo: "billing" }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { id: number; startSha: string | null; endSha: string | null };
+    expect(firstBody.startSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(firstBody.endSha).toBeNull();
+
+    writeFileSync(path.join(worktree, "a.ts"), "export const a = 1;\n");
+    git(worktree, ["add", "a.ts"]);
+    git(worktree, ["commit", "-m", "add a"]);
+    const firstResult = await app.request(`/api/targets/${firstBody.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "success", summary: "added a" }),
+    });
+    expect(firstResult.status).toBe(200);
+    const firstDone = (await firstResult.json()) as { endSha: string | null };
+    expect(firstDone.endSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(firstDone.endSha).not.toBe(firstBody.startSha);
+
+    const second = await app.request("/api/projects/billing-api/targets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "add b", feature: "charge-keys", repo: "billing" }),
+    });
+    const secondBody = (await second.json()) as { id: number; startSha: string | null };
+    expect(secondBody.startSha).toBe(firstDone.endSha);
+
+    writeFileSync(path.join(worktree, "b.ts"), "export const b = 2;\n");
+    git(worktree, ["add", "b.ts"]);
+    git(worktree, ["commit", "-m", "add b"]);
+    const secondResult = await app.request(`/api/targets/${secondBody.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "success", summary: "added b" }),
+    });
+    expect(secondResult.status).toBe(200);
+
+    const whole = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1");
+    const wholeBody = (await whole.json()) as { files: Array<{ path: string }> };
+    expect(wholeBody.files.map((file) => file.path).sort()).toEqual(["a.ts", "b.ts"]);
+
+    const firstDiff = await app.request(`/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1&target=${firstBody.id}`);
+    expect(firstDiff.status).toBe(200);
+    const firstView = (await firstDiff.json()) as {
+      files: Array<{ path: string }>;
+      sections: Array<{ path: string; rows: Array<{ right: string | null }> }>;
+      range: { kind: string; ready: boolean; live: boolean; fromRef: string; toRef: string };
+      error: string | null;
+    };
+    expect(firstView.error).toBeNull();
+    expect(firstView.range).toMatchObject({ kind: "base", ready: true, live: false, fromRef: firstBody.startSha, toRef: firstDone.endSha });
+    expect(firstView.files.map((file) => file.path)).toEqual(["a.ts"]);
+    expect(firstView.sections[0]?.rows.some((row) => row.right?.includes("const a"))).toBe(true);
+
+    const secondDiff = await app.request(`/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1&target=${secondBody.id}`);
+    const secondView = (await secondDiff.json()) as {
+      files: Array<{ path: string }>;
+      sections: Array<{ rows: Array<{ right: string | null }> }>;
+      range: { kind: string; fromRef: string; ready: boolean };
+    };
+    expect(secondView.range).toMatchObject({ kind: "previous", fromRef: firstDone.endSha, ready: true });
+    expect(secondView.files.map((file) => file.path)).toEqual(["b.ts"]);
+    expect(secondView.sections[0]?.rows.some((row) => row.right?.includes("const b"))).toBe(true);
+
+    const third = await app.request("/api/projects/billing-api/targets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "add c", feature: "charge-keys", repo: "billing" }),
+    });
+    const thirdBody = (await third.json()) as { id: number };
+    writeFileSync(path.join(worktree, "c.ts"), "export const c = 3;\n");
+    git(worktree, ["add", "c.ts"]);
+    const live = await app.request(`/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1&target=${thirdBody.id}`);
+    const liveView = (await live.json()) as { files: Array<{ path: string }>; range: { live: boolean; ready: boolean; toRef: string } };
+    expect(liveView.range).toMatchObject({ live: true, ready: true, toRef: "HEAD" });
+    expect(liveView.files.map((file) => file.path)).toEqual(["c.ts"]);
+
+    const missing = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&target=999");
+    expect(missing.status).toBe(404);
+    const bad = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&target=nope");
+    expect(bad.status).toBe(400);
+    store.close();
+  });
 });

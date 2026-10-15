@@ -316,6 +316,14 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 }
 
 .target { margin: 8px 0; }
+.target-range { margin: 4px 0 8px; }
+.target-range summary { cursor: pointer; }
+.target-diff {
+  height: 280px;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
 .target-line { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0; align-items: baseline; }
 .target .muted { margin: 2px 0; }
 

@@ -23,6 +23,8 @@ CREATE TABLE targets (
   branch TEXT,
   herdr_status TEXT,
   herdr_result TEXT,
+  start_sha TEXT,
+  end_sha TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -95,6 +97,10 @@ CREATE INDEX rounds_feature_repo_idx ON rounds(feature_repo_id);
 
 const SCHEMA_V3 = `${SCHEMA_V2}${ROUNDS_TABLE}`;
 const SCHEMA_V2_TO_V3 = ROUNDS_TABLE;
+const TARGET_SHA_COLUMNS = [
+  ["start_sha", "TEXT"],
+  ["end_sha", "TEXT"],
+] as const;
 
 const SCHEMA_V1_TO_V2 = `
 ALTER TABLE targets ADD COLUMN feature_id INTEGER;
@@ -151,18 +157,28 @@ export function openDatabase(dbPath: string): DatabaseSync {
   return db;
 }
 
+function ensureColumns(db: DatabaseSync, table: string, columns: ReadonlyArray<readonly [string, string]>): void {
+  const present = new Set(
+    rows(db.prepare(`PRAGMA table_info(${table})`)).map((column) => text(column, "name")),
+  );
+  for (const [name, definition] of columns) {
+    if (!present.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+  }
+}
+
 function migrate(db: DatabaseSync): void {
   const row = db.prepare("PRAGMA user_version").get();
   const version = row && typeof row.user_version === "number" ? row.user_version : 0;
-  if (version >= 3) return;
+  if (version >= 4) return;
   db.exec("BEGIN");
   try {
     if (version < 1) db.exec(SCHEMA_V3);
     else {
       if (version < 2) db.exec(SCHEMA_V1_TO_V2);
-      db.exec(SCHEMA_V2_TO_V3);
+      if (version < 3) db.exec(SCHEMA_V2_TO_V3);
+      ensureColumns(db, "targets", TARGET_SHA_COLUMNS);
     }
-    db.exec("PRAGMA user_version = 3;");
+    db.exec("PRAGMA user_version = 4;");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

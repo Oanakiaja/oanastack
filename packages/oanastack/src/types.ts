@@ -41,6 +41,10 @@ export interface Target {
   branch: string | null;
   herdrStatus: string | null;
   herdrResult: string | null;
+  /** HEAD when the target was opened on a worktree. */
+  startSha: string | null;
+  /** HEAD when the target was finished (`result` or `done`). */
+  endSha: string | null;
   createdAt: string;
   updatedAt: string;
   completions: Completion[];
@@ -157,6 +161,7 @@ export interface AddTargetInput {
   branch?: string | null;
   feature?: string | null;
   repo?: string | null;
+  startSha?: string | null;
 }
 
 export interface LinkTargetInput {
@@ -172,6 +177,12 @@ export interface ResultInput {
   branch?: string | null;
   herdrStatus?: string | null;
   herdrResult?: string | null;
+  endSha?: string | null;
+}
+
+export interface TargetShasInput {
+  startSha?: string | null;
+  endSha?: string | null;
 }
 
 export interface CompletionInput {

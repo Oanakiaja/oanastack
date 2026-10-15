@@ -133,7 +133,9 @@ describe("store", () => {
 
     const again = new DatabaseSync(dbPath);
     const version = again.prepare("PRAGMA user_version").get() as { user_version: number };
-    expect(version.user_version).toBe(3);
+    expect(version.user_version).toBe(4);
+    const columns = again.prepare("PRAGMA table_info(targets)").all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toEqual(expect.arrayContaining(["start_sha", "end_sha"]));
     again.close();
   });
 
@@ -167,8 +169,27 @@ describe("store", () => {
     store.close();
     const again = new DatabaseSync(dbPath);
     const version = again.prepare("PRAGMA user_version").get() as { user_version: number };
-    expect(version.user_version).toBe(3);
+    expect(version.user_version).toBe(4);
     again.close();
+  });
+
+  it("records start and end shas and rejects a bad sha", () => {
+    const store = openStore(tempDb());
+    store.addProject({ slug: "billing-api" });
+    const target = store.addTarget({ project: "billing-api", title: "keys", startSha: "ABC1234" });
+    expect(target.startSha).toBe("abc1234");
+    expect(target.endSha).toBeNull();
+    const done = store.setResult(target.id, { status: "success", endSha: "def56789" });
+    expect(done.endSha).toBe("def56789");
+    expect(done.startSha).toBe("abc1234");
+    const kept = store.setResult(target.id, { status: "failed", summary: "nope" });
+    expect(kept.endSha).toBe("def56789");
+    expect(kept.startSha).toBe("abc1234");
+    expect(() => store.setTargetShas(target.id, { endSha: "not-a-sha" })).toThrow(StoreError);
+    const cleared = store.setTargetShas(target.id, { startSha: null });
+    expect(cleared.startSha).toBeNull();
+    expect(cleared.endSha).toBe("def56789");
+    store.close();
   });
 
   it("stores a round on one repo worktree and clips a missing summary", () => {

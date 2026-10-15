@@ -1,9 +1,11 @@
-import { mkdtempSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCli } from "../src/cli/run.js";
 import { openStore } from "../src/store.js";
+import { createFeature, registerRepo } from "../src/workspace.js";
 
 function tempDb(): string {
   return path.join(mkdtempSync(path.join(tmpdir(), "oanastack-")), "oanastack.sqlite");
@@ -170,5 +172,56 @@ describe("cli", () => {
     const bare = await capture(["round", "add", "billing-api", "charge-keys", "--repo", "billing", "--json"], dbPath);
     expect(bare.code).toBe(2);
     expect(JSON.parse(bare.stderr).error).toContain("--instruction");
+  });
+
+  it("records worktree HEAD on target add, result, and done", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "oanastack-cli-sha-"));
+    const repo = path.join(root, "src", "billing");
+    mkdirSync(repo, { recursive: true });
+    const git = (cwd: string, args: string[]) => {
+      const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+    };
+    git(repo, ["init", "-b", "main"]);
+    git(repo, ["config", "user.email", "test@example.com"]);
+    git(repo, ["config", "user.name", "oanastack test"]);
+    writeFileSync(path.join(repo, "README.md"), "hi\n");
+    git(repo, ["add", "README.md"]);
+    git(repo, ["commit", "-m", "init"]);
+
+    const dbPath = path.join(root, "oanastack.sqlite");
+    const store = openStore(dbPath);
+    registerRepo(store, { name: "billing", path: repo });
+    store.addProject({ slug: "billing-api" });
+    createFeature(store, store.root, { project: "billing-api", slug: "charge-keys", repos: [{ name: "billing", base: "main" }] });
+    store.close();
+    const worktree = path.join(root, "projects", "billing-api", "features", "charge-keys", "billing");
+
+    const added = await capture(["target", "add", "billing-api", "add a", "--feature", "charge-keys", "--json"], dbPath);
+    expect(added.code, added.stderr).toBe(0);
+    const created = JSON.parse(added.stdout) as { id: number; startSha: string | null; endSha: string | null };
+    expect(created.startSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(created.endSha).toBeNull();
+
+    writeFileSync(path.join(worktree, "a.ts"), "export const a = 1;\n");
+    git(worktree, ["add", "a.ts"]);
+    git(worktree, ["commit", "-m", "add a"]);
+    const resulted = await capture(["target", "result", String(created.id), "success", "--summary", "added a", "--json"], dbPath);
+    expect(resulted.code, resulted.stderr).toBe(0);
+    const finished = JSON.parse(resulted.stdout) as { endSha: string | null };
+    expect(finished.endSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(finished.endSha).not.toBe(created.startSha);
+
+    writeFileSync(path.join(worktree, "b.ts"), "export const b = 1;\n");
+    git(worktree, ["add", "b.ts"]);
+    git(worktree, ["commit", "-m", "add b"]);
+    const done = await capture(
+      ["done", String(created.id), "--changed", "b", "--why", "next", "--verified", "git", "--json"],
+      dbPath,
+    );
+    expect(done.code, done.stderr).toBe(0);
+    const after = openStore(dbPath);
+    expect(after.getTarget(created.id).endSha).not.toBe(finished.endSha);
+    after.close();
   });
 });

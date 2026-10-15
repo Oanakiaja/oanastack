@@ -1,5 +1,6 @@
 import { defineCommand } from "citty";
 import { StoreError } from "../errors.js";
+import { headSha } from "../git.js";
 import { openStore, type Store } from "../store.js";
 import { startServer } from "../server.js";
 import { resolveWebRoot } from "../api.js";
@@ -29,6 +30,12 @@ function refresh(store: Store, featureId: number | null): void {
   if (featureId !== null) syncFeatureContext(store, featureId);
 }
 
+function rememberHead(store: Store, target: Target, field: "start" | "end"): Target {
+  const sha = headSha(target.worktreePath);
+  if (!sha) return target;
+  return field === "start" ? store.setTargetShas(target.id, { startSha: sha }) : store.setTargetShas(target.id, { endSha: sha });
+}
+
 function requireId(raw: string): number {
   if (!/^[1-9]\d*$/.test(raw)) throw new StoreError("id must be a positive integer", "invalid");
   return Number(raw);
@@ -55,6 +62,8 @@ function targetBrief(target: Target) {
     feature: target.featureSlug,
     worktreePath: target.worktreePath,
     branch: target.branch,
+    startSha: target.startSha,
+    endSha: target.endSha,
     herdrStatus: target.herdrStatus,
     herdrResult: target.herdrResult,
     completions: target.completions.map((completion) => completion.id),
@@ -132,6 +141,7 @@ const targetAdd = defineCommand({
     branch: { type: "string", description: "Branch" },
     feature: { type: "string", description: "Feature slug" },
     repo: { type: "string", description: "Repo name when the feature spans several" },
+    "start-sha": { type: "string", description: "Start commit (defaults to worktree HEAD)" },
     json,
   },
   run({ args }) {
@@ -143,9 +153,11 @@ const targetAdd = defineCommand({
         branch: args.branch,
         feature: args.feature,
         repo: args.repo,
+        startSha: args["start-sha"],
       });
-      refresh(store, created.featureId);
-      return created;
+      const recorded = created.startSha ? created : rememberHead(store, created, "start");
+      refresh(store, recorded.featureId);
+      return recorded;
     });
     emit(args.json === true, targetBrief(target), `target ${target.id} ${target.projectSlug} open ${target.title}`);
   },
@@ -196,17 +208,24 @@ const targetResult = defineCommand({
     branch: { type: "string", description: "Branch" },
     "herdr-status": { type: "string", description: "herdr status text" },
     herdr: { type: "string", description: "herdr result text" },
+    "end-sha": { type: "string", description: "End commit (defaults to worktree HEAD)" },
     json,
   },
   run({ args }) {
     const target = using((store) => {
-      const updated = store.setResult(requireId(args.id), {
+      const id = requireId(args.id);
+      if (args.status !== "success" && args.status !== "failed" && args.status !== "rejected") {
+        throw new StoreError("status must be success, failed, or rejected", "invalid");
+      }
+      const current = store.getTarget(id);
+      const updated = store.setResult(id, {
         status: args.status as "success" | "failed" | "rejected",
         summary: args.summary,
         worktreePath: args.wt,
         branch: args.branch,
         herdrStatus: args["herdr-status"],
         herdrResult: args.herdr,
+        endSha: args["end-sha"] ?? headSha(args.wt ?? current.worktreePath) ?? undefined,
       });
       refresh(store, updated.featureId);
       return updated;
@@ -275,7 +294,9 @@ const done = defineCommand({
   run({ args }) {
     const input = completionFromArgs(args);
     const completion = using((store) => {
-      const created = store.addCompletion(requireId(args.id), input);
+      const id = requireId(args.id);
+      rememberHead(store, store.getTarget(id), "end");
+      const created = store.addCompletion(id, input);
       refresh(store, store.getTarget(created.targetId).featureId);
       return created;
     });

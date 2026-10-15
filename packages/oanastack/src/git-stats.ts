@@ -89,6 +89,13 @@ export function measureWorktree(input: {
   };
 }
 
+export interface DiffSpan {
+  fromRef: string;
+  toRef: string;
+  /** Diff the worktree working tree against `fromRef` (open tip). */
+  live?: boolean;
+}
+
 export function diffWorktree(
   input: {
     repoPath: string;
@@ -97,9 +104,9 @@ export function diffWorktree(
     branch: string;
   },
   file: string | undefined,
-  scope?: { all?: boolean; dir?: string },
+  scope?: { all?: boolean; dir?: string; span?: DiffSpan },
 ): WorktreeDiff {
-  const located = locate(input);
+  const located = scope?.span ? locateSpan(input, scope.span) : locate(input);
   if ("error" in located) {
     return blankDiff(input.baseBranch, input.branch, located.error);
   }
@@ -225,10 +232,12 @@ export function parseSideBySide(unified: string): { rows: DiffRow[]; truncated: 
 interface Located {
   cwd: string;
   base: string;
-  /** Set when the branch must be named. Null means diff the worktree working tree against base, and count commits from HEAD. */
+  /** Set when the branch must be named. HEAD means diff the worktree working tree against base. */
   head: string;
   worktree: boolean;
   dirty: boolean;
+  /** Two-dot `from` `to`, used for a target's incremental range. */
+  span: boolean;
 }
 
 function locate(input: {
@@ -243,10 +252,40 @@ function locate(input: {
   const base = resolveBaseRef(cwd, input.baseBranch);
   if (!base) return { error: `base branch not found: ${input.baseBranch}` };
   if (worktree) {
-    return { cwd: worktree, base, head: "HEAD", worktree: true, dirty: !isCleanQuiet(worktree) };
+    return { cwd: worktree, base, head: "HEAD", worktree: true, dirty: !isCleanQuiet(worktree), span: false };
   }
   if (!refExists(cwd, `refs/heads/${input.branch}`)) return { error: `branch not found: ${input.branch}` };
-  return { cwd, base, head: input.branch, worktree: false, dirty: false };
+  return { cwd, base, head: input.branch, worktree: false, dirty: false, span: false };
+}
+
+function locateSpan(
+  input: {
+    repoPath: string;
+    worktreePath: string | null;
+  },
+  span: DiffSpan,
+): Located | { error: string } {
+  const worktree = input.worktreePath && existsSync(input.worktreePath) ? input.worktreePath : null;
+  const cwd = worktree ?? input.repoPath;
+  if (!existsSync(cwd)) return { error: `path missing: ${cwd}` };
+  const from = resolveCommit(cwd, span.fromRef);
+  if (!from) return { error: `commit not found: ${span.fromRef}` };
+  if (span.live && worktree) {
+    return { cwd: worktree, base: from, head: "HEAD", worktree: true, dirty: !isCleanQuiet(worktree), span: false };
+  }
+  const to = resolveCommit(cwd, span.toRef);
+  if (!to) return { error: `commit not found: ${span.toRef}` };
+  return { cwd, base: from, head: to, worktree: false, dirty: false, span: true };
+}
+
+function resolveCommit(cwd: string, ref: string): string | null {
+  if (!/^[A-Za-z0-9._/-]{1,200}$/.test(ref) || ref.includes("..") || ref.startsWith("-")) return null;
+  const named = !/^[0-9a-f]{7,64}$/i.test(ref) && ref !== "HEAD" ? resolveBaseRef(cwd, ref) : null;
+  const candidate = named ?? ref;
+  const parsed = git(cwd, ["rev-parse", "--verify", "--quiet", `${candidate}^{commit}`], { allowFail: true });
+  if (parsed.status !== 0) return null;
+  const sha = parsed.stdout.trim();
+  return sha || null;
 }
 
 function resolveBaseRef(cwd: string, base: string): string | null {
@@ -273,6 +312,8 @@ function revList(cwd: string, base: string, head: string): { ahead: number; behi
 }
 
 function diffArgs(located: Located): string[] {
+  // Incremental target range: two-dot patch from the previous commit to this one.
+  if (located.span) return [located.base, located.head];
   // Worktree: working tree versus the base commit, so uncommitted edits are included.
   // Closed worktree: the named branch versus the base.
   if (located.worktree) return [located.base];

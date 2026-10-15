@@ -24,6 +24,7 @@ import {
   type Round,
   type ResultStatus,
   type Target,
+  type TargetShasInput,
   type TargetStatus,
 } from "./types.js";
 
@@ -66,6 +67,8 @@ interface TargetRow {
   branch: string | null;
   herdrStatus: string | null;
   herdrResult: string | null;
+  startSha: string | null;
+  endSha: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -283,6 +286,7 @@ export class Store {
     const title = requireText(input.title, "title", LIMITS.title);
     let worktreePath = optionalText(input.worktreePath, "worktree", LIMITS.path);
     let branch = optionalText(input.branch, "branch", LIMITS.branch);
+    const startSha = optionalSha(input.startSha);
     const linked = this.resolveFeatureLink(project, input.feature, input.repo);
     if (linked.link) {
       if (worktreePath === null) worktreePath = linked.link.worktreePath;
@@ -292,10 +296,10 @@ export class Store {
     const info = this.db
       .prepare(
         `INSERT INTO targets (
-          project_id, feature_id, title, status, worktree_path, branch, created_at, updated_at
-        ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)`,
+          project_id, feature_id, title, status, worktree_path, branch, start_sha, created_at, updated_at
+        ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)`,
       )
-      .run(project.id, linked.featureId, title, worktreePath, branch, now, now);
+      .run(project.id, linked.featureId, title, worktreePath, branch, startSha, now, now);
     this.touchProject(project.id, now);
     return this.requireTarget(rowId(info.lastInsertRowid));
   }
@@ -333,11 +337,12 @@ export class Store {
     const branch = patchText(input.branch, "branch", LIMITS.branch);
     const herdrStatus = patchText(input.herdrStatus, "herdr-status", LIMITS.herdrStatus);
     const herdrResult = patchText(input.herdrResult, "herdr", LIMITS.herdrResult);
+    const endSha = input.endSha === undefined ? current.endSha : optionalSha(input.endSha);
     const now = iso();
     this.db
       .prepare(
         `UPDATE targets
-         SET status = ?, summary = ?, worktree_path = ?, branch = ?, herdr_status = ?, herdr_result = ?, updated_at = ?
+         SET status = ?, summary = ?, worktree_path = ?, branch = ?, herdr_status = ?, herdr_result = ?, end_sha = ?, updated_at = ?
          WHERE id = ?`,
       )
       .run(
@@ -347,9 +352,21 @@ export class Store {
         branch === undefined ? current.branch : branch,
         herdrStatus === undefined ? current.herdrStatus : herdrStatus,
         herdrResult === undefined ? current.herdrResult : herdrResult,
+        endSha,
         now,
         id,
       );
+    this.touchProject(current.projectId, now);
+    return this.requireTarget(id);
+  }
+
+  setTargetShas(id: number, input: TargetShasInput): Target {
+    const current = this.targetRow(id);
+    if (!current) throw new StoreError(`target not found: ${id}`, "not_found");
+    const startSha = input.startSha === undefined ? current.startSha : optionalSha(input.startSha);
+    const endSha = input.endSha === undefined ? current.endSha : optionalSha(input.endSha);
+    const now = iso();
+    this.db.prepare("UPDATE targets SET start_sha = ?, end_sha = ?, updated_at = ? WHERE id = ?").run(startSha, endSha, now, id);
     this.touchProject(current.projectId, now);
     return this.requireTarget(id);
   }
@@ -542,6 +559,8 @@ export class Store {
       branch: textOrNull(row, "branch"),
       herdrStatus: textOrNull(row, "herdr_status"),
       herdrResult: textOrNull(row, "herdr_result"),
+      startSha: textOrNull(row, "start_sha"),
+      endSha: textOrNull(row, "end_sha"),
       createdAt: text(row, "created_at"),
       updatedAt: text(row, "updated_at"),
     }));
@@ -675,6 +694,16 @@ function requireText(value: string, field: string, max: number): string {
   const trimmed = value.trim();
   if (!trimmed) throw new StoreError(`${field} is required`, "invalid");
   if (trimmed.length > max) throw new StoreError(`${field} is too long`, "invalid");
+  return trimmed;
+}
+
+const SHA_RE = /^[0-9a-f]{7,64}$/i;
+
+function optionalSha(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (!SHA_RE.test(trimmed)) throw new StoreError("sha must be 7–64 hex characters", "invalid");
   return trimmed;
 }
 

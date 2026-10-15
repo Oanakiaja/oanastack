@@ -372,7 +372,12 @@ function progressLines(feature: Feature): string {
       const completions = ids ? ` — completion ${ids}` : "";
       const latest = target.completions[0];
       const review = latest?.review ? ` — check: ${oneLine(latest.review)}` : "";
-      return `- #${target.id} ${target.status} ${target.title}${completions}${review}`;
+      const span = target.endSha
+        ? ` — ${(target.startSha ?? "base").slice(0, 7)}..${target.endSha.slice(0, 7)}`
+        : target.startSha
+          ? ` — start ${target.startSha.slice(0, 7)}`
+          : "";
+      return `- #${target.id} ${target.status} ${target.title}${span}${completions}${review}`;
     })
     .join("\n");
 }

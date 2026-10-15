@@ -1,5 +1,8 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { StoreError } from "./errors.js";
+
+const SHA_RE = /^[0-9a-f]{7,64}$/i;
 
 export interface GitResult {
   status: number;
@@ -25,6 +28,15 @@ export function git(cwd: string, args: string[], options?: { allowFail?: boolean
     throw new StoreError(`git ${args.join(" ")} failed: ${tail(stderr || stdout)}`, "invalid");
   }
   return { status, stdout, stderr };
+}
+
+/** Current commit of a worktree. Null when the path is not a git checkout. */
+export function headSha(cwd: string | null | undefined): string | null {
+  if (!cwd || !existsSync(cwd)) return null;
+  const result = git(cwd, ["rev-parse", "HEAD"], { allowFail: true });
+  if (result.status !== 0) return null;
+  const sha = result.stdout.trim().toLowerCase();
+  return SHA_RE.test(sha) ? sha : null;
 }
 
 export function gitTopLevel(dir: string): string | null {

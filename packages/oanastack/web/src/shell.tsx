@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { compareTaskOrder, onWorktree, taskRanges } from "../../src/task-range";
 import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Target } from "../../src/types.ts";
 import { featureCounts, recentResults, reviewLines, sumProgress } from "./board";
 import { DiffPanel } from "./diff-view";
@@ -319,7 +320,12 @@ function WorktreeDetail({
   onReload: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const targets = project.targets.filter((item) => item.featureId === feature.id && belongsTo(item, repo, feature));
+  const targets = onWorktree(
+    project.targets.filter((item) => item.featureId === feature.id),
+    repo,
+    feature.repos.length,
+  ).sort(compareTaskOrder);
+  const ranges = taskRanges(targets, repo.baseBranch);
   const away = distanceText(distance?.ahead ?? null, distance?.behind ?? null);
   const actionable = feature.status === "open" || feature.status === "review";
 
@@ -375,7 +381,15 @@ function WorktreeDetail({
         {targets.length === 0 ? <p className="muted">还没有 target。</p> : null}
         <ul className="target-list">
           {targets.map((target) => (
-            <TargetBlock key={target.id} target={target} />
+            <TargetBlock
+              key={target.id}
+              target={target}
+              range={ranges.find((item) => item.id === target.id)}
+              project={project.slug}
+              feature={feature.slug}
+              repo={repo.name}
+              refreshKey={refreshKey}
+            />
           ))}
         </ul>
       </div>
@@ -439,14 +453,24 @@ function RoundRow({ round }: { round: Round }) {
   );
 }
 
-function belongsTo(target: Target, repo: FeatureRepoLink, feature: Feature): boolean {
-  if (target.worktreePath && repo.worktreePath && target.worktreePath === repo.worktreePath) return true;
-  if (!target.worktreePath && feature.repos.length === 1) return true;
-  return false;
-}
-
-function TargetBlock({ target }: { target: Target }) {
+function TargetBlock({
+  target,
+  range,
+  project,
+  feature,
+  repo,
+  refreshKey,
+}: {
+  target: Target;
+  range?: ReturnType<typeof taskRanges>[number];
+  project?: string;
+  feature?: string;
+  repo?: string;
+  refreshKey?: number;
+}) {
   const [openId, setOpenId] = useState<number | null>(target.completions[0]?.id ?? null);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const label = range?.kind === "previous" ? "相对上一任务的 diff" : "相对 base 的 diff";
   return (
     <li className="target">
       <p className="target-line">
@@ -455,6 +479,7 @@ function TargetBlock({ target }: { target: Target }) {
         <StatusPill kind="target" status={target.status} />
       </p>
       {target.summary ? <p className="muted">{target.summary}</p> : null}
+      {target.endSha ? <p className="mono muted">end {target.endSha.slice(0, 7)}</p> : null}
       {target.completions.length === 0 ? <p className="muted">没有完成记录。</p> : null}
       {target.completions.map((record) => (
         <div key={record.id}>
@@ -469,6 +494,28 @@ function TargetBlock({ target }: { target: Target }) {
           {openId === record.id ? <CompletionBody record={record} /> : null}
         </div>
       ))}
+      {project && feature && repo ? (
+        <details
+          className="target-range"
+          onToggle={(event) => setDiffOpen(event.currentTarget.open)}
+        >
+          <summary>{label}</summary>
+          {diffOpen && range?.live ? <p className="muted">进行中，对照当前 HEAD。</p> : null}
+          {diffOpen && range?.ready ? (
+            <DiffPanel
+              project={project}
+              feature={feature}
+              repo={repo}
+              refreshKey={refreshKey ?? 0}
+              targetId={target.id}
+              heading="左 from · 右 to"
+              emptyText="这段没有 diff。"
+              compact
+            />
+          ) : null}
+          {diffOpen && range && !range.ready ? <p className="muted">{range.message}</p> : null}
+        </details>
+      ) : null}
     </li>
   );
 }

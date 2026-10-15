@@ -50,11 +50,19 @@ export function DiffPanel({
   feature,
   repo,
   refreshKey,
+  targetId,
+  heading = "左 base · 右 worktree",
+  emptyText = "与 base 没有 diff。",
+  compact = false,
 }: {
   project: string;
   feature: string;
   repo: string;
   refreshKey: number;
+  targetId?: number;
+  heading?: string;
+  emptyText?: string;
+  compact?: boolean;
 }) {
   const [diff, setDiff] = useState<DiffPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +75,7 @@ export function DiffPanel({
     setActiveDir(null);
     setActiveFile(null);
     const query = new URLSearchParams({ feature, repo, all: "1" });
+    if (targetId !== undefined) query.set("target", String(targetId));
     void fetch(`/api/projects/${encodeURIComponent(project)}/diff?${query.toString()}`)
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorText(response));
@@ -84,20 +93,20 @@ export function DiffPanel({
     return () => {
       cancelled = true;
     };
-  }, [project, feature, repo, refreshKey]);
+  }, [project, feature, repo, refreshKey, targetId]);
 
   useEffect(() => {
     if (!activeFile) return;
-    document.getElementById(fileAnchor(activeFile))?.scrollIntoView({ block: "start" });
-  }, [activeFile, activeDir, diff]);
+    document.getElementById(fileAnchor(activeFile, targetId === undefined ? "base" : `t${targetId}`))?.scrollIntoView({ block: "start" });
+  }, [activeFile, activeDir, diff, targetId]);
 
   return (
-    <div className="detail-diff">
+    <div className={compact ? "detail-diff target-diff" : "detail-diff"}>
       <section className="pane" aria-label="目录">
         <h2>目录</h2>
         {error ? <p className="muted">{error}</p> : null}
         {diff?.error ? <p className="muted">{diff.error}</p> : null}
-        {diff && diff.files.length === 0 && !diff.error ? <p className="muted">与 base 没有 diff。</p> : null}
+        {diff && diff.files.length === 0 && !diff.error ? <p className="muted">{emptyText}</p> : null}
         {diff && diff.files.length > 0 ? (
           <FileTree
             files={diff.files}
@@ -122,7 +131,7 @@ export function DiffPanel({
         {diff === null && !error ? <p className="muted">读取 diff</p> : null}
       </section>
       <section className="pane diff-pane" aria-label="side-by-side diff" ref={pane}>
-        <h2>左 base · 右 worktree</h2>
+        <h2>{heading}</h2>
         {diff ? (
           <p className="muted">
             {diff.base} · {diff.head}
@@ -138,13 +147,13 @@ export function DiffPanel({
           </p>
         ) : null}
         {diff?.sectionsTruncated ? <p className="muted">只显示前 40 个文件。</p> : null}
-        <DiffSections diff={diff} dir={activeDir} />
+        <DiffSections diff={diff} dir={activeDir} scope={targetId === undefined ? "base" : `t${targetId}`} />
       </section>
     </div>
   );
 }
 
-function DiffSections({ diff, dir }: { diff: DiffPayload | null; dir: string | null }) {
+function DiffSections({ diff, dir, scope }: { diff: DiffPayload | null; dir: string | null; scope: string }) {
   const sections = filesUnder(sectionsOf(diff), dir);
   if (!diff || diff.error || sections.length === 0) return null;
   return (
@@ -153,7 +162,7 @@ function DiffSections({ diff, dir }: { diff: DiffPayload | null; dir: string | n
         const language = languageOf(section.path);
         const name = section.path.split("/").pop() ?? section.path;
         return (
-          <article key={section.path} id={fileAnchor(section.path)} className="diff-file">
+          <article key={section.path} id={fileAnchor(section.path, scope)} className="diff-file">
             <h3>
               <span className="mono">{section.status}</span>
               <FileIcon name={name} />
@@ -209,8 +218,8 @@ function sectionsOf(diff: DiffPayload | null): DiffSection[] {
   }];
 }
 
-function fileAnchor(path: string): string {
-  return `diff-file-${path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+function fileAnchor(path: string, scope: string): string {
+  return `diff-file-${scope}-${path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 async function errorText(response: Response): Promise<string> {

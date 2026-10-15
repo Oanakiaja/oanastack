@@ -30,6 +30,8 @@ description: Log reviewable progress with the oanastack CLI (repo, project, feat
 
 先 `result` 再 `done`。`done` 不会改 target 状态。herdr 只存自由文本。已有 target 用 `target link <id> --feature <slug>` 挂到 feature 上。
 
+`target add` 会在已知 worktree 上把当时的 HEAD 记成 `startSha`。`target result` 和 `done` 把当时的 HEAD 记成 `endSha`。看板在每个 worktree 下按 target 的创建顺序做增量 diff：第一条是 base（或 start commit）到本任务的 end commit，后面每条是上一任务的 end commit 到本任务的 end commit。任务还是 open、没有 end commit 时，展开后是「进行中，完成后才有任务 diff」；只有当前最后一个 open 的 target 会对照当前 HEAD。做完一个 target 后要跑 `target result` 或 `done`，任务之间的 diff 才有端点。不在 worktree 里时可以用 `--start-sha` / `--end-sha` 显式写入。
+
 ## 命令
 
 ```bash
@@ -43,9 +45,9 @@ oanastack feature ls [project] --json
 oanastack feature status <feature> [--project <project>] --json
 oanastack feature merge <feature> [--project <project>] [--local] --json
 oanastack feature close <feature> [--project <project>] [--abandon] --json
-oanastack target add <project> "<title>" [--feature <slug>] [--repo <name>] [--wt <path>] [--branch <name>] --json
+oanastack target add <project> "<title>" [--feature <slug>] [--repo <name>] [--wt <path>] [--branch <name>] [--start-sha <sha>] --json
 oanastack target link <id> --feature <slug> [--project <project>] [--repo <name>] --json
-oanastack target result <id> success|failed|rejected [--summary <text>] [--wt <path>] [--branch <name>] [--herdr-status <text>] [--herdr <text>] --json
+oanastack target result <id> success|failed|rejected [--summary <text>] [--wt <path>] [--branch <name>] [--herdr-status <text>] [--herdr <text>] [--end-sha <sha>] --json
 oanastack done <id> --changed "<what>" --why "<why>" --verified "<tests/screenshots/links>" [--risks "<unfinished>"] [--check "<what the user should check>"] --json
 oanastack round add <project> <feature> --repo <name> --instruction "<full ask>" --reply "<full reply>" [--summary "<short ask>"] [--outcome "<short result>"] [--tools "<tool chatter>"] --json
 oanastack round ls <project> <feature> --repo <name> --json
@@ -61,7 +63,7 @@ oanastack serve
 
 `--verified` 写测试命令、截图路径或链接。`--check` 写用户该看什么、期望什么。没有未完成的部分就省略 `--risks`。
 
-`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。左侧始终是树：项目 → base branch → worktree（名称、状态标签、领先/落后）。打开 `#/` 是总看板，汇总所有项目，不会自动选中第一个。点项目名进入该项目汇总；点 worktree 后显示它的状态、对话轮次、target 结果、完成记录，以及相对 base 的左右 diff。对话轮次默认收起，一行是指令摘要和回复结果；展开后是完整指令和完整回复，工具过程另收一层。目录按扩展名显示文件和文件夹图标，代码按 TS、JS、JSON 等语言着色。状态是浅色底的标签，例如进行中、等 review、已完成、失败。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
+`serve` 只监听 localhost，默认 `http://127.0.0.1:4747`。左侧始终是树：项目 → base branch → worktree（名称、状态标签、领先/落后）。打开 `#/` 是总看板，汇总所有项目，不会自动选中第一个。点项目名进入该项目汇总；点 worktree 后显示它的状态、对话轮次、target 结果、完成记录，以及相对 base 的左右 diff。每个 target 下还有可折叠的增量 diff：第一条是「相对 base 的 diff」，之后是「相对上一任务的 diff」。对话轮次默认收起，一行是指令摘要和回复结果；展开后是完整指令和完整回复，工具过程另收一层。目录按扩展名显示文件和文件夹图标，代码按 TS、JS、JSON 等语言着色。状态是浅色底的标签，例如进行中、等 review、已完成、失败。登记仓库可以填绝对路径，也可以在页面里浏览目录。创建 feature 时按仓库选 base 分支。用户点开一条完成记录就能复查。
 
 也可以把同一组字段放进 `--data '{"changed":"…","why":"…","verified":"…","check":"…"}'`。
 
