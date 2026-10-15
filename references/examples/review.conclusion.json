@@ -1,0 +1,143 @@
+{
+  "conclusion_id": "cn_a4904d4e47337b89ac433d93fa578cab3f5dc02cc00b0a28dde11de134974837",
+  "playbook": "review",
+  "question": "Does example/billing#14 match its charge-once intent, and is the behavior tested?",
+  "status": "answered",
+  "summary": "Intent matches the charge-once title. The diff touches src/charge.ts and no test file. That gap is observed in the file list. Tests were not run, so a pass is not claimed.",
+  "what_was_done": [
+    "Read the pull request title and the changed-file summary.",
+    "Did not push, rebase, or merge."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev_25cce20e1f3f79bc407408f051758792c9f8d5faa02fdd3c6c5b9d21b6f6f73d",
+      "provider": {
+        "id": "gh",
+        "name": "GitHub CLI",
+        "version": "2.67.0"
+      },
+      "subject": {
+        "kind": "pull_request",
+        "name": "example/billing#14",
+        "locator": "https://github.com/example/billing/pull/14",
+        "digest": {
+          "algorithm": "sha256",
+          "hex": "5cd622944411cdaf8ff8b9dd8a2d34102bae4a7225eebedce9a0b4d4ba5495ad"
+        },
+        "git_oid": "0123456789abcdef0123456789abcdef01234567"
+      },
+      "operation": "gh pr view",
+      "parameters": {
+        "repository": "example/billing",
+        "number": 14
+      },
+      "raw_result": null,
+      "normalized_result": {
+        "title": "Charge once per checkout",
+        "state": "open",
+        "mergeable": "unknown"
+      },
+      "confidence": "observed",
+      "authority": "forge",
+      "limitations": [
+        "mergeable was not returned by the forge payload used here"
+      ],
+      "locations": [
+        {
+          "kind": "pull_request",
+          "url": "https://github.com/example/billing/pull/14",
+          "number": 14,
+          "repository": "example/billing"
+        }
+      ],
+      "evidence_links": [],
+      "coverage": {
+        "status": "partial",
+        "examined": "pull request metadata only"
+      }
+    },
+    {
+      "evidence_id": "ev_d41cd0083d60b1475948a6cf10756ca62609d87bcd2153b562f9bd33810c481a",
+      "provider": {
+        "id": "gh",
+        "name": "GitHub CLI",
+        "version": "2.67.0"
+      },
+      "subject": {
+        "kind": "diff",
+        "name": "example/billing head",
+        "locator": "example/billing@0123456789abcdef0123456789abcdef01234567",
+        "digest": {
+          "algorithm": "sha256",
+          "hex": "04078d6466e3976ce8dc655466ac5910db4a5b861e76df38cffd4df4d40f7fc9"
+        },
+        "git_oid": "0123456789abcdef0123456789abcdef01234567"
+      },
+      "operation": "gh pr diff",
+      "parameters": {
+        "repository": "example/billing",
+        "number": 14
+      },
+      "raw_result": null,
+      "normalized_result": {
+        "files": [
+          "src/charge.ts"
+        ],
+        "tests_touched": []
+      },
+      "confidence": "observed",
+      "authority": "forge",
+      "limitations": [
+        "full patch is paged; file list is the summary"
+      ],
+      "locations": [
+        {
+          "kind": "file",
+          "path": "src/charge.ts",
+          "line": null
+        }
+      ],
+      "evidence_links": [],
+      "coverage": {
+        "status": "partial",
+        "examined": "changed file paths"
+      },
+      "page": {
+        "parent_evidence_id": "ev_d41cd0083d60b1475948a6cf10756ca62609d87bcd2153b562f9bd33810c481a",
+        "detail": "summary",
+        "cursor": null,
+        "complete": false
+      }
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "unk-tests-not-run",
+      "question": "Do the existing tests pass on this head?",
+      "why_unknown": "This review did not execute tests. Absence of a run is not a failure.",
+      "required_authority": "local_command",
+      "evidence_links": [
+        "ev_d41cd0083d60b1475948a6cf10756ca62609d87bcd2153b562f9bd33810c481a"
+      ]
+    }
+  ],
+  "needs_human": [],
+  "normalized": {
+    "intent_aligned": true,
+    "risks": [
+      "Charge behavior changed without a test file in the diff."
+    ],
+    "test_gaps": [
+      "No test file in the changed-file summary."
+    ],
+    "comments": [
+      {
+        "path": "src/charge.ts",
+        "line": null,
+        "body": "Add a test that places the order twice and expects one charge.",
+        "nit": false
+      }
+    ],
+    "verdict": "changes_requested"
+  }
+}

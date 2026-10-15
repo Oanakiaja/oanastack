@@ -4,6 +4,10 @@
 
 Recording reusable scripts, CLI, Skill, Prompt, Plugins.
 
+## 设计草案
+
+[`references/architecture.md`](references/architecture.md) 是未实现的架构草案：统一的 Evidence / conclusion、按仓库远程主机选择 executor、以及将来替代下面手工 `ln -s` 的 `oana setup` / `oana doctor`。安装方式仍是本文的软链，直到后续 PR 落地这些命令。草案不是已有 CLI。
+
 ## Skill 安装
 
 优先软链到 `~/.agents/skills/oanastack`：
