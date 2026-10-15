@@ -5,3 +5,11 @@ export function statusMark(status: string): string {
   if (letter === "D") return "-";
   return letter || "?";
 }
+
+/** Color tone for a status badge. M and other letters stay readable, not gray. */
+export function statusTone(status: string): "add" | "del" | "mod" {
+  const mark = statusMark(status);
+  if (mark === "+") return "add";
+  if (mark === "-") return "del";
+  return "mod";
+}

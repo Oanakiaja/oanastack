@@ -6,7 +6,7 @@ import { FileIcon } from "./file-icons";
 import { languageOf } from "./file-kind";
 import { FileTree } from "./file-tree";
 import { DIFF_LEFT, MID_WIDTH, TREE_WIDTH, useDiffView, useStoredNumber } from "./layout-pref";
-import { statusMark } from "./status-mark";
+import { statusMark, statusTone } from "./status-mark";
 
 interface DiffRow {
   kind: "context" | "add" | "del" | "change";
@@ -310,7 +310,6 @@ function useDiffModel({
 
   const tree = (
     <section className="pane tree-col" aria-label="目录">
-      <h2>目录</h2>
       {error ? <p className="muted">{error}</p> : null}
       {diff?.error ? <p className="muted">{diff.error}</p> : null}
       {diff && diff.files.length === 0 && !diff.error ? <p className="muted">{emptyText}</p> : null}
@@ -321,11 +320,6 @@ function useDiffModel({
           activeFile={activeFile}
           onAll={() => {
             setActiveDir(null);
-            if (mode === "scroll") setActiveFile(null);
-            pane.current?.scrollTo({ top: 0 });
-          }}
-          onDir={(path) => {
-            setActiveDir(path);
             if (mode === "scroll") setActiveFile(null);
             pane.current?.scrollTo({ top: 0 });
           }}
@@ -503,10 +497,13 @@ function DiffSections({
         return (
           <article key={section.path} id={fileAnchor(section.path, scope)} className="diff-file">
             <h3>
-              <span className="mono">{statusMark(section.status)}</span>
+              <span className={`mono letter tone-${statusTone(section.status)}`}>{statusMark(section.status)}</span>
               <FileIcon name={name} />
               <span>{section.path}</span>
-              <span className="muted">+{section.added} −{section.removed}</span>
+              <span className="counts">
+                <span className="stat-add">+{section.added}</span>
+                <span className="stat-del">−{section.removed}</span>
+              </span>
             </h3>
             {section.binary ? <p className="muted">二进制文件，无法左右对照。</p> : null}
             {section.truncated ? <p className="muted">diff 已截断，只显示前 400 行。用右侧「全量」看完整文件。</p> : null}
