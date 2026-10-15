@@ -104,7 +104,7 @@ export function diffWorktree(
     branch: string;
   },
   file: string | undefined,
-  scope?: { all?: boolean; dir?: string; span?: DiffSpan },
+  scope?: { all?: boolean; dir?: string; span?: DiffSpan; full?: boolean },
 ): WorktreeDiff {
   const located = scope?.span ? locateSpan(input, scope.span) : locate(input);
   if ("error" in located) {
@@ -114,8 +114,9 @@ export function diffWorktree(
   if (files.error) return { ...blankDiff(located.base, located.head, files.error), dirty: located.dirty };
   const pool = scope?.dir ? filesUnder(files.files, scope.dir) : files.files;
   const many = scope?.all === true || Boolean(scope?.dir);
+  const full = scope?.full === true && !many;
   const targets = many ? pool.slice(0, SECTION_CAP) : pickOne(files.files, file);
-  const sections = targets.map((item) => sectionFor(located, item));
+  const sections = targets.map((item) => sectionFor(located, item, full && item.path === file));
   const focus = sections.find((item) => item.path === file) ?? sections.find((item) => !item.binary) ?? sections[0] ?? null;
   return {
     base: located.base,
@@ -138,7 +139,7 @@ function pickOne(files: DiffFileStat[], file: string | undefined): DiffFileStat[
   return selected ? [selected] : [];
 }
 
-function sectionFor(located: Located, file: DiffFileStat): DiffSection {
+function sectionFor(located: Located, file: DiffFileStat, full = false): DiffSection {
   if (file.binary) {
     return { path: file.path, status: file.status, added: file.added, removed: file.removed, binary: true, truncated: false, rows: [] };
   }
@@ -146,7 +147,7 @@ function sectionFor(located: Located, file: DiffFileStat): DiffSection {
   if (raw.status !== 0) {
     return { path: file.path, status: file.status, added: file.added, removed: file.removed, binary: false, truncated: false, rows: [] };
   }
-  const parsed = parseSideBySide(raw.stdout);
+  const parsed = parseSideBySide(raw.stdout, full ? Number.POSITIVE_INFINITY : ROW_CAP);
   return {
     path: file.path,
     status: file.status,
@@ -158,8 +159,8 @@ function sectionFor(located: Located, file: DiffFileStat): DiffSection {
   };
 }
 
-/** Turn a unified diff into left (base) / right (worktree) rows. */
-export function parseSideBySide(unified: string): { rows: DiffRow[]; truncated: boolean } {
+/** Turn a unified diff into left (base) / right (worktree) rows. `cap` limits rows; pass `Infinity` for the whole file. */
+export function parseSideBySide(unified: string, cap = ROW_CAP): { rows: DiffRow[]; truncated: boolean } {
   const rows: DiffRow[] = [];
   let leftNo = 0;
   let rightNo = 0;
@@ -171,7 +172,7 @@ export function parseSideBySide(unified: string): { rows: DiffRow[]; truncated: 
   const flush = () => {
     const count = Math.max(dels.length, adds.length);
     for (let i = 0; i < count; i += 1) {
-      if (rows.length >= ROW_CAP) {
+      if (rows.length >= cap) {
         truncated = true;
         dels.length = 0;
         adds.length = 0;
@@ -192,7 +193,7 @@ export function parseSideBySide(unified: string): { rows: DiffRow[]; truncated: 
   };
 
   for (const line of unified.split("\n")) {
-    if (rows.length >= ROW_CAP) {
+    if (rows.length >= cap) {
       truncated = true;
       break;
     }

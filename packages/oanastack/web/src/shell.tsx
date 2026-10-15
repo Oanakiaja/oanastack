@@ -3,6 +3,8 @@ import { compareTaskOrder, onWorktree, taskRanges } from "../../src/task-range";
 import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Target } from "../../src/types.ts";
 import { featureCounts, recentResults, reviewLines, sumProgress } from "./board";
 import { DiffPanel } from "./diff-view";
+import { DragBar } from "./drag-bar";
+import { NAV_WIDTH, useStoredNumber } from "./layout-pref";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "./nav-tree";
@@ -33,9 +35,10 @@ export function Shell({
   const feature = featureSlug ? project?.features.find((item) => item.slug === featureSlug) : undefined;
   const repo = feature?.repos.find((item) => item.name === repoName);
   const detail = feature && repo ? { feature, repo } : null;
+  const [navWidth, setNavWidth] = useStoredNumber(NAV_WIDTH);
 
   return (
-    <main className="split">
+    <main className="split" style={{ ["--nav-width" as string]: `${navWidth}px` }}>
       <section className="pane nav-pane" aria-label="项目">
         <h2>项目</h2>
         {overview && overview.projects.length === 0 ? (
@@ -69,6 +72,14 @@ export function Shell({
           }}
         />
       </section>
+      <DragBar
+        label="项目栏宽度"
+        value={navWidth}
+        min={NAV_WIDTH.min}
+        max={NAV_WIDTH.max}
+        unit="px"
+        onChange={setNavWidth}
+      />
       <section className={detail ? "detail" : "pane overview-pane"} aria-label={detail ? "worktree" : project ? "汇总" : "总看板"}>
         {detail && project ? (
           <WorktreeDetail

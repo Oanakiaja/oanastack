@@ -3,6 +3,7 @@ import { featureCounts, pickProject, recentResults, reviewLines, sumProgress, ty
 import { highlightCode } from "../web/src/code-highlight";
 import { iconKind, languageOf } from "../web/src/file-kind";
 import { featureLabel, targetLabel } from "../web/src/labels";
+import { statusMark } from "../web/src/status-mark";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "../web/src/nav-tree";
 import { parseHash, projectHash, worktreeHash } from "../web/src/route";
 
@@ -144,6 +145,13 @@ describe("dashboard navigation", () => {
     expect(targetLabel("failed")).toBe("失败");
     expect(targetLabel("success")).toBe("成功");
     expect(targetLabel("rejected")).toBe("不做");
+  });
+
+  it("marks added files with + and deleted files with -", () => {
+    expect(statusMark("A")).toBe("+");
+    expect(statusMark("D")).toBe("-");
+    expect(statusMark("M")).toBe("M");
+    expect(statusMark("R")).toBe("R");
   });
 
   it("maps file extensions to an icon and a highlight language", () => {

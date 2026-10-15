@@ -94,7 +94,11 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
     if (dir && (dir.startsWith("/") || dir.split("/").includes(".."))) {
       throw new StoreError("dir must be a relative path inside the diff", "invalid");
     }
-    const scope = { all: c.req.query("all") === "1", dir: dir || undefined };
+    const scope = {
+      all: c.req.query("all") === "1",
+      dir: dir || undefined,
+      full: c.req.query("full") === "1" && Boolean(file) && c.req.query("all") !== "1",
+    };
     const targetId = targetQuery(c.req.query("target"));
     if (targetId === null) {
       return c.json(
@@ -253,7 +257,7 @@ function diffForTarget(
   repo: FeatureRepoLink,
   targetId: number,
   file: string | undefined,
-  scope: { all?: boolean; dir?: string },
+  scope: { all?: boolean; dir?: string; full?: boolean },
 ): WorktreeDiff & { range: TaskRange } {
   const linked = onWorktree(feature.targets, repo, feature.repos.length);
   const ranges = taskRanges(linked, repo.baseBranch);

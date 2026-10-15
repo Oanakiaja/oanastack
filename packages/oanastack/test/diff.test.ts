@@ -29,6 +29,18 @@ function initRepo(dir: string): void {
 }
 
 describe("worktree diff", () => {
+  it("returns every row of a selected file when the cap is lifted", () => {
+    const lines = ["@@ -1,450 +1,450 @@"];
+    for (let i = 0; i < 450; i += 1) lines.push(` line ${i}`);
+    const capped = parseSideBySide(lines.join("\n"));
+    expect(capped.truncated).toBe(true);
+    expect(capped.rows).toHaveLength(400);
+    const full = parseSideBySide(lines.join("\n"), Number.POSITIVE_INFINITY);
+    expect(full.truncated).toBe(false);
+    expect(full.rows).toHaveLength(450);
+    expect(full.rows[449]?.right).toBe("line 449");
+  });
+
   it("parses a unified diff into left and right rows", () => {
     const parsed = parseSideBySide(
       [
@@ -186,6 +198,23 @@ describe("worktree diff", () => {
 
     const escaped = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&dir=../secret");
     expect(escaped.status).toBe(400);
+
+    const longBody = Array.from({ length: 420 }, (_, index) => `export const line${index} = ${index};`).join("\n") + "\n";
+    writeFileSync(path.join(worktree, "src", "long.ts"), longBody);
+    git(worktree, ["add", "src/long.ts"]);
+    git(worktree, ["commit", "-m", "long file"]);
+    const stacked = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1&file=src/long.ts");
+    const stackedView = (await stacked.json()) as { sections: Array<{ path: string; truncated: boolean; rows: unknown[] }> };
+    const stackedLong = stackedView.sections.find((section) => section.path === "src/long.ts");
+    expect(stackedLong?.truncated).toBe(true);
+    expect(stackedLong?.rows.length).toBe(400);
+    const whole = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&file=src/long.ts&full=1");
+    expect(whole.status).toBe(200);
+    const wholeView = (await whole.json()) as { file: string | null; truncated: boolean; rows: unknown[]; sections: Array<{ truncated: boolean; rows: unknown[] }> };
+    expect(wholeView.file).toBe("src/long.ts");
+    expect(wholeView.truncated).toBe(false);
+    expect(wholeView.rows.length).toBeGreaterThan(400);
+    expect(wholeView.sections[0]?.truncated).toBe(false);
     store.close();
   });
 
