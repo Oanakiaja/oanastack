@@ -1,6 +1,6 @@
 ---
 name: herdr grokbot
-description: 用 herdr 让云端 Grok Bot 经用户批准的远程 shell 驱动本机 Codex（工作区、启动、prompt、读输出、批准），并在 done/blocked 时用监听脚本把最后输出 POST 给 webhook routine 以唤醒 Grok Bot。不要用于 oana grokc 本地会话、Cursor Cloud Agent、未读屏幕就同意批准框，或把 webhook URL / Authorization 写进聊天。
+description: 用 herdr 让云端 Grok Bot 经用户批准的远程 shell 驱动本机 Codex（工作区、启动、prompt、读输出、批准），并在 done/blocked 时用监听脚本把最后输出 POST 给 webhook routine 以唤醒 Grok Bot。不要用于 Cursor Cloud Agent、未读屏幕就同意批准框，或把 webhook URL / Authorization 写进聊天。
 ---
 
 # herdr grokbot
@@ -49,7 +49,7 @@ flowchart LR
 - 批准框之外不要往输入框发字符。输错用 `ctrl+u` 清行。
 - 模型不被账号支持时用 `-m` 覆盖，不改用户的 `~/.codex/config.toml`。
 - webhook URL 和 Authorization 只放 `~/.config/herdr/grokbot-webhook.env`，不要贴进聊天。
-- 本机 `oana grokc` 会话和 Cursor Cloud Agent 走各自的 skill，不用这条回路替代。
+- Cursor Cloud Agent 走它自己的路径，不用这条回路替代。
 
 ## 搭建
 
