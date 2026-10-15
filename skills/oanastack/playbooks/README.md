@@ -15,12 +15,12 @@
 | 复现后的最小修复 | `bugfix.md` |
 | 计划并跑目标验证 | `test.md` |
 | 看 PR/diff、写评论 | `review.md` |
-| 盯 PR 到 merge-ready（冲突 / 线程 / CI） | `babysit.md` |
+| 盯 feature→main frontier /「变绿」（review + e2e，只通知） | `babysit.md` |
 | CI 红了：先分类再重试 | `cicd.md`（细则 `../references/ci-classify.md`） |
 | 清理 worktree / `oana feature done` | `cleanup.md` |
 | 排查完沉淀 / 复盘 / 架构反思 | `reflect.md` |
 
-**没有 shipping 卡。** merge / land / ship 是 owner-only：`babysit.md` 推到 merge-ready 后由 owner 合入。只写评论走 `review.md`，不要和 babysit 混用。
+**没有 shipping 卡。** merge / land / ship 是 owner-only：`babysit.md` 在 review 与 e2e / 目标验证都有证据后只通知 owner，由 owner 合入。只写评论走 `review.md`，不要和 babysit 混用。
 
 共用纪律：禁止直接改生产环境配置；默认 `gh`，不要 Graphite；worktree 只用 `oana` / `wt`。长 coding session 用 herdr 驱动本机 Codex，仍挂在同一 worktree 平面（见 `../../herdr-grokbot/SKILL.md`）。
 
@@ -31,7 +31,7 @@
 - `bugfix.md` — 复现 → 根因 → 最小修复 → 证据。
 - `test.md` — 目标验证；「编译过」不是验收。
 - `review.md` — 看 diff、写可执行评论；不推 CI。
-- `babysit.md` — 只推 merge frontier 到 merge-ready，不 merge。
+- `babysit.md` — `feat.md` 开出指向 `main` / `master` 的 frontier，或用户明确要求时进入 `drive`；review + e2e / 目标验证之后只通知 owner，不 merge。
 - `cicd.md` — CI 先分类：fresh-build / fix / rebase-report。
 - `cleanup.md` — 按 `oana feature done` 清理；dirty 需确认。
 - `reflect.md` — 按复杂度/根因门槛沉淀或做架构反思。

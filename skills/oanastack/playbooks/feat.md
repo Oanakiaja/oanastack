@@ -10,7 +10,7 @@
 2. **写验收标准与边界。** 可验证、可失败；写清不做什么。
 3. **小步实现。** 优先可验证改动；每步能独立证明。多仓按 alias 在各自 worktree 提交，不串仓污染。
 4. **提交前验证并留下证据。** 目标验证走 `test.md`。「编译过」不是验收。
-5. **开 PR，不在这里 merge。** 做完再批量 merge；盯 CI / 评论走 `babysit.md`。merge / land / ship 是 owner-only：babysit 到 merge-ready 后由 owner 合入。
+5. **开 PR，交给 babysit，不在这里 merge。** feature frontier 指向 `main` / `master` 的 PR/MR 开出后，交接到 `babysit.md` 的 `drive`：连续 review、e2e / 目标验证、修到 merge-ready，然后只通知 owner。feat 不 `gh pr merge`，不 arm merge-when-ready。多仓做完后的批量 merge 仍由 owner 做。
 6. **合并或放弃后清理。** `oana feature done <slug>`，纪律见 `cleanup.md`。复杂度/根因够深时走 `reflect.md`。
 
 ## 工具边界
