@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Overview, Project } from "../../src/types.ts";
+import type { Overview } from "../../src/types.ts";
+import { pickProject } from "./board";
 import { distanceKey, Shell } from "./shell";
 import { projectHash, readRoute, type Route } from "./route";
 
@@ -71,14 +72,15 @@ export function App() {
     };
   }, [slugKey, refreshKey]);
 
-  const project = selectedProject(overview, route.project);
+  const home = route.project === undefined;
+  const project = overview && route.project ? pickProject(overview.projects, route.project) : undefined;
   const error = actionError ?? loadError;
 
   return (
     <div className="app">
       <header className="top">
         <a className="brand" href="#/">oanastack</a>
-        <span className="current">{project?.name ?? "进度"}</span>
+        <span className="current">{home ? "总览" : (project?.name ?? "进度")}</span>
         <nav>
           {project && route.feature && route.repo ? <a href={projectHash(project.slug)}>汇总</a> : null}
           <button
@@ -96,6 +98,7 @@ export function App() {
       <Shell
         overview={overview}
         distances={distances}
+        home={home}
         project={project}
         featureSlug={route.feature}
         repoName={route.repo}
@@ -105,10 +108,4 @@ export function App() {
       />
     </div>
   );
-}
-
-function selectedProject(overview: Overview | null, slug: string | undefined): Project | undefined {
-  if (!overview || overview.projects.length === 0) return undefined;
-  if (!slug) return overview.projects[0];
-  return overview.projects.find((item) => item.slug === slug);
 }

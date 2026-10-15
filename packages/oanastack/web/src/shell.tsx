@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Target } from "../../src/types.ts";
+import { featureCounts, recentResults, reviewLines, sumProgress } from "./board";
 import { DiffPanel } from "./diff-view";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
@@ -10,6 +11,7 @@ import { FeatureForm, ProjectForm, RepoForm } from "./setup";
 export function Shell({
   overview,
   distances,
+  home,
   project,
   featureSlug,
   repoName,
@@ -19,6 +21,7 @@ export function Shell({
 }: {
   overview: Overview | null;
   distances: Record<string, Record<string, { ahead: number | null; behind: number | null }>>;
+  home: boolean;
   project: Project | undefined;
   featureSlug?: string;
   repoName?: string;
@@ -65,7 +68,7 @@ export function Shell({
           }}
         />
       </section>
-      <section className={detail ? "detail" : "pane overview-pane"} aria-label={detail ? "worktree" : "汇总"}>
+      <section className={detail ? "detail" : "pane overview-pane"} aria-label={detail ? "worktree" : project ? "汇总" : "总看板"}>
         {detail && project ? (
           <WorktreeDetail
             project={project}
@@ -76,8 +79,14 @@ export function Shell({
             onError={onError}
             onReload={onReload}
           />
-        ) : (
+        ) : !overview ? (
+          <p className="muted">读取中</p>
+        ) : project ? (
           <ProjectOverview project={project} onError={onError} onReload={onReload} />
+        ) : home ? (
+          <GlobalBoard projects={overview.projects} />
+        ) : (
+          <p className="muted">找不到这个项目。</p>
         )}
       </section>
     </main>
@@ -158,6 +167,94 @@ function WorktreeRow({
       <StatusPill kind="feature" status={node.featureStatus} />
       {distance ? <span className="dist">{distance}</span> : null}
     </a>
+  );
+}
+
+function GlobalBoard({ projects }: { projects: Project[] }) {
+  if (projects.length === 0) {
+    return (
+      <>
+        <h2>总看板</h2>
+        <p className="muted">还没有项目。登记 repo，添加项目，再创建 feature。</p>
+      </>
+    );
+  }
+  const features = featureCounts(projects.flatMap((project) => project.features));
+  const targets = sumProgress(projects);
+  const recent = recentResults(projects);
+  const waiting = reviewLines(projects);
+  return (
+    <>
+      <h2>总看板</h2>
+      <div className="rollup">
+        <p className="counts">
+          <span>feature</span>
+          <span>已完成 {features.done}</span>
+          <span>进行中 {features.open}</span>
+          <span>等 review {features.review}</span>
+          <span>已放弃 {features.abandoned}</span>
+        </p>
+        <p className="counts">
+          <span>target</span>
+          <span>成功 {targets.success}</span>
+          <span>进行中 {targets.open}</span>
+          <span>失败 {targets.failed}</span>
+          <span>不做 {targets.rejected}</span>
+        </p>
+        <h3>项目</h3>
+        <ul className="board-list">
+          {projects.map((project) => {
+            const rowFeatures = featureCounts(project.features);
+            return (
+              <li key={project.id} className="board-row">
+                <p className="board-name">
+                  <a href={projectHash(project.slug)}>{project.name}</a>
+                  <span className="muted mono">{project.slug}</span>
+                </p>
+                {project.note ? <p className="muted">{project.note}</p> : null}
+                <p className="counts">
+                  <span>feature</span>
+                  <span>进行中 {rowFeatures.open}</span>
+                  <span>等 review {rowFeatures.review}</span>
+                  <span>已完成 {rowFeatures.done}</span>
+                </p>
+                <p className="counts">
+                  <span>target</span>
+                  <span>成功 {project.progress.success}</span>
+                  <span>进行中 {project.progress.open}</span>
+                  <span>失败 {project.progress.failed}</span>
+                  <span>不做 {project.progress.rejected}</span>
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+        <h3>最近结果</h3>
+        {recent.length === 0 ? <p className="muted">还没有 target。</p> : null}
+        <ul className="plain">
+          {recent.map(({ slug, name, target }) => (
+            <li key={`${slug}-${target.id}`}>
+              <StatusPill kind="target" status={target.status} />
+              <span>{target.title}</span>
+              <a className="muted" href={projectHash(slug)}>{name}</a>
+              {target.summary ? <span className="muted">{target.summary}</span> : null}
+            </li>
+          ))}
+        </ul>
+        <h3>等 review</h3>
+        {waiting.length === 0 ? <p className="muted">没有等待 review 的条目。</p> : null}
+        <ul className="plain">
+          {waiting.map((line) => (
+            <li key={line.key}>
+              {line.kind === "feature" ? <StatusPill kind="feature" status="review" /> : <span className="muted">要看什么</span>}
+              <span>{line.title}</span>
+              <a className="muted" href={projectHash(line.projectSlug)}>{line.projectName}</a>
+              {line.detail ? <span className="muted">{line.detail}</span> : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   );
 }
 

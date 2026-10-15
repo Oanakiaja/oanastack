@@ -327,6 +327,11 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
 .record dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .rollup h3 { margin: 14px 0 6px; font-size: 12px; font-weight: 650; }
+.board-list { list-style: none; margin: 0; padding: 0; }
+.board-row { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.board-row p { margin: 0 0 2px; }
+.board-name { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.board-name a { font-weight: 650; text-decoration: none; }
 .counts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 6px; }
 .plain li { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 0 0 6px; }
 
