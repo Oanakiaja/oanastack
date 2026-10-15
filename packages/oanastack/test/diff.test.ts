@@ -18,6 +18,12 @@ function git(cwd: string, args: string[]): void {
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
 }
 
+function gitText(cwd: string, args: string[]): string {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+  return result.stdout.trim();
+}
+
 function initRepo(dir: string): void {
   mkdirSync(dir, { recursive: true });
   git(dir, ["init", "-b", "main"]);
@@ -318,6 +324,63 @@ describe("worktree diff", () => {
     expect(missing.status).toBe(404);
     const bad = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&target=nope");
     expect(bad.status).toBe(400);
+    store.close();
+  });
+
+  it("lists branches and commits, and a chosen commit changes the diff", async () => {
+    const root = tempDir();
+    const billing = path.join(root, "src", "billing");
+    initRepo(billing);
+    const store = openStore(path.join(root, "oanastack.sqlite"));
+    registerRepo(store, { name: "billing", path: billing });
+    store.addProject({ slug: "billing-api", name: "Billing API" });
+    createFeature(store, store.root, {
+      project: "billing-api",
+      slug: "charge-keys",
+      repos: [{ name: "billing", base: "main" }],
+    });
+    const worktree = path.join(root, "projects", "billing-api", "features", "charge-keys", "billing");
+    writeFileSync(path.join(worktree, "a.ts"), "export const a = 1;\n");
+    git(worktree, ["add", "a.ts"]);
+    git(worktree, ["commit", "-m", "add a"]);
+    const first = gitText(worktree, ["rev-parse", "HEAD"]);
+    writeFileSync(path.join(worktree, "b.ts"), "export const b = 2;\n");
+    git(worktree, ["add", "b.ts"]);
+    git(worktree, ["commit", "-m", "add b"]);
+
+    const app = createApp(store, { webRoot: null });
+    const refs = await app.request("/api/projects/billing-api/refs?feature=charge-keys&repo=billing");
+    expect(refs.status).toBe(200);
+    const listed = (await refs.json()) as {
+      branches: string[];
+      head: string | null;
+      commits: Array<{ sha: string; short: string; subject: string }>;
+    };
+    expect(listed.branches).toEqual(expect.arrayContaining(["main", "feature/charge-keys"]));
+    expect(listed.head).toMatch(/^[0-9a-f]{40}$/);
+    expect(listed.commits.map((commit) => commit.subject)).toEqual(expect.arrayContaining(["add a", "add b"]));
+    expect(listed.commits.find((commit) => commit.subject === "add a")?.sha).toBe(first);
+
+    const missing = await app.request("/api/projects/billing-api/refs");
+    expect(missing.status).toBe(400);
+
+    const paths = async (search: string) => {
+      const response = await app.request(`/api/projects/billing-api/diff?feature=charge-keys&repo=billing&all=1${search}`);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { files: Array<{ path: string }>; error: string | null };
+      expect(body.error).toBeNull();
+      return body.files.map((file) => file.path).sort();
+    };
+    const base = await paths("");
+    const live = await paths("&left=main&right=WORKTREE");
+    expect(live).toEqual(base);
+    expect(live).toEqual(["a.ts", "b.ts"]);
+    expect(await paths(`&left=main&right=${first}`)).toEqual(["a.ts"]);
+
+    const escaped = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&left=../secret");
+    expect(escaped.status).toBe(400);
+    const dotted = await app.request("/api/projects/billing-api/diff?feature=charge-keys&repo=billing&right=feature/../main");
+    expect(dotted.status).toBe(400);
     store.close();
   });
 });

@@ -7,6 +7,7 @@ export type DiffViewMode = "scroll" | "full";
 const VIEW_KEY = "oanastack.diffView";
 export const NAV_WIDTH = { key: "oanastack.navWidth", fallback: 340, min: 220, max: 560 } as const;
 export const TREE_WIDTH = { key: "oanastack.treeWidth", fallback: 230, min: 160, max: 520 } as const;
+export const MID_WIDTH = { key: "oanastack.midWidth", fallback: 380, min: 260, max: 680 } as const;
 export const DIFF_LEFT = { key: "oanastack.diffLeft", fallback: 50, min: 25, max: 75 } as const;
 
 function clamp(value: number, min: number, max: number): number {

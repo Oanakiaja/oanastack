@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { StoreError } from "./errors.js";
-import { headSha } from "./git.js";
+import { headSha, listBranches, recentCommits } from "./git.js";
 import { diffWorktree, measureWorktree, type WorktreeDiff } from "./git-stats.js";
 import type { Store } from "./store.js";
 import { onWorktree, taskRanges, type TaskRange } from "./task-range.js";
@@ -82,6 +82,17 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
     );
     return c.json({ project: project.slug, worktrees });
   });
+  app.get("/api/projects/:slug/refs", (c) => {
+    const featureSlug = c.req.query("feature");
+    const repoName = c.req.query("repo");
+    if (!featureSlug || !repoName) throw new StoreError("feature and repo are required", "invalid");
+    const feature = store.getFeature(c.req.param("slug"), featureSlug);
+    const repo = feature.repos.find((item) => item.name === repoName);
+    if (!repo) throw new StoreError(`repo not on feature: ${repoName}`, "not_found");
+    const cwd = repo.worktreePath && existsSync(repo.worktreePath) ? repo.worktreePath : repo.path;
+    if (!existsSync(cwd)) throw new StoreError(`path missing: ${cwd}`, "not_found");
+    return c.json({ branches: listBranches(cwd), head: headSha(cwd), commits: recentCommits(cwd) });
+  });
   app.get("/api/projects/:slug/diff", (c) => {
     const featureSlug = c.req.query("feature");
     const repoName = c.req.query("repo");
@@ -98,6 +109,8 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
       all: c.req.query("all") === "1",
       dir: dir || undefined,
       full: c.req.query("full") === "1" && Boolean(file) && c.req.query("all") !== "1",
+      left: optionalRef(c.req.query("left")),
+      right: optionalRef(c.req.query("right")),
     };
     const targetId = targetQuery(c.req.query("target"));
     if (targetId === null) {
@@ -238,6 +251,15 @@ export function createApp(store: Store, options?: { webRoot?: string | null; env
   });
 
   return app;
+}
+
+function optionalRef(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (raw === "WORKTREE" || raw === "HEAD") return raw;
+  if (!/^[A-Za-z0-9._/-]{1,200}$/.test(raw) || raw.includes("..") || raw.startsWith("-")) {
+    throw new StoreError("ref must be a branch or commit", "invalid");
+  }
+  return raw;
 }
 
 function targetQuery(raw: string | undefined): number | null {

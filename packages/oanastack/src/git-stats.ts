@@ -104,9 +104,13 @@ export function diffWorktree(
     branch: string;
   },
   file: string | undefined,
-  scope?: { all?: boolean; dir?: string; span?: DiffSpan; full?: boolean },
+  scope?: { all?: boolean; dir?: string; span?: DiffSpan; full?: boolean; left?: string; right?: string },
 ): WorktreeDiff {
-  const located = scope?.span ? locateSpan(input, scope.span) : locate(input);
+  const located = scope?.span
+    ? locateSpan(input, scope.span)
+    : scope?.left || scope?.right
+      ? locateSides(input, scope.left, scope.right)
+      : locate(input);
   if ("error" in located) {
     return blankDiff(input.baseBranch, input.branch, located.error);
   }
@@ -257,6 +261,23 @@ function locate(input: {
   }
   if (!refExists(cwd, `refs/heads/${input.branch}`)) return { error: `branch not found: ${input.branch}` };
   return { cwd, base, head: input.branch, worktree: false, dirty: false, span: false };
+}
+
+function locateSides(
+  input: {
+    repoPath: string;
+    worktreePath: string | null;
+    baseBranch: string;
+    branch: string;
+  },
+  left: string | undefined,
+  right: string | undefined,
+): Located | { error: string } {
+  const fromRef = left || input.baseBranch;
+  const worktree = input.worktreePath && existsSync(input.worktreePath) ? input.worktreePath : null;
+  const live = (!right || right === "WORKTREE") && Boolean(worktree);
+  const toRef = !right || right === "WORKTREE" ? input.branch || "HEAD" : right;
+  return locateSpan(input, { fromRef, toRef, live });
 }
 
 function locateSpan(

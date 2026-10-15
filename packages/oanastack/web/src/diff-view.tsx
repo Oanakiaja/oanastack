@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { filesUnder } from "../../src/diff-tree";
 import { highlightCode } from "./code-highlight";
 import { DragBar } from "./drag-bar";
 import { FileIcon } from "./file-icons";
 import { languageOf } from "./file-kind";
 import { FileTree } from "./file-tree";
-import { DIFF_LEFT, TREE_WIDTH, useDiffView, useStoredNumber } from "./layout-pref";
+import { DIFF_LEFT, MID_WIDTH, TREE_WIDTH, useDiffView, useStoredNumber } from "./layout-pref";
 import { statusMark } from "./status-mark";
 
 interface DiffRow {
@@ -48,6 +48,33 @@ interface DiffPayload {
   error: string | null;
 }
 
+interface CommitOption {
+  sha: string;
+  short: string;
+  subject: string;
+}
+
+interface RefPayload {
+  branches: string[];
+  head: string | null;
+  commits: CommitOption[];
+}
+
+interface DiffModelProps {
+  project: string;
+  feature: string;
+  repo: string;
+  refreshKey: number;
+  targetId?: number;
+  heading?: string;
+  emptyText?: string;
+  pickRefs?: boolean;
+  baseBranch?: string;
+  branch?: string;
+}
+
+const SHA = /^[0-9a-f]{7,64}$/i;
+
 export function DiffPanel({
   project,
   feature,
@@ -67,6 +94,75 @@ export function DiffPanel({
   emptyText?: string;
   compact?: boolean;
 }) {
+  const [treeWidth, setTreeWidth] = useStoredNumber(TREE_WIDTH);
+  const model = useDiffModel({ project, feature, repo, refreshKey, targetId, heading, emptyText });
+  return (
+    <div
+      className={compact ? "detail-diff target-diff" : "detail-diff"}
+      style={{ ["--tree-width" as string]: `${treeWidth}px` }}
+    >
+      {model.tree}
+      <DragBar
+        label="目录宽度"
+        value={treeWidth}
+        min={TREE_WIDTH.min}
+        max={TREE_WIDTH.max}
+        unit="px"
+        onChange={setTreeWidth}
+      />
+      {model.viewer}
+    </div>
+  );
+}
+
+/** Worktree page: file tree in the middle column, diff in the third, with branch/commit pickers. */
+export function DiffColumns({
+  meta,
+  midWidth,
+  onMidWidth,
+  ...props
+}: DiffModelProps & {
+  baseBranch: string;
+  branch: string;
+  meta: ReactNode;
+  midWidth: number;
+  onMidWidth: (next: number) => void;
+}) {
+  const model = useDiffModel({ ...props, pickRefs: true });
+  return (
+    <>
+      <section className="mid-col" aria-label="worktree">
+        <div className="detail-meta">{meta}</div>
+        {model.tree}
+      </section>
+      <DragBar
+        className="drag-bar split-mid"
+        label="目录栏宽度"
+        value={midWidth}
+        min={MID_WIDTH.min}
+        max={MID_WIDTH.max}
+        unit="px"
+        onChange={onMidWidth}
+      />
+      <section className="diff-col" aria-label="diff">
+        {model.viewer}
+      </section>
+    </>
+  );
+}
+
+function useDiffModel({
+  project,
+  feature,
+  repo,
+  refreshKey,
+  targetId,
+  heading = "左 base · 右 worktree",
+  emptyText = "与 base 没有 diff。",
+  pickRefs = false,
+  baseBranch = "",
+  branch = "",
+}: DiffModelProps): { tree: ReactNode; viewer: ReactNode } {
   const [diff, setDiff] = useState<DiffPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullSection, setFullSection] = useState<DiffSection | null>(null);
@@ -74,18 +170,60 @@ export function DiffPanel({
   const [activeDir, setActiveDir] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [mode, setMode] = useDiffView();
-  const [treeWidth, setTreeWidth] = useStoredNumber(TREE_WIDTH);
   const [diffLeft, setDiffLeft] = useStoredNumber(DIFF_LEFT);
+  const [refs, setRefs] = useState<RefPayload | null>(null);
+  const [leftBranch, setLeftBranch] = useState(baseBranch);
+  const [rightBranch, setRightBranch] = useState(branch);
+  const [leftCommit, setLeftCommit] = useState("");
+  const [rightCommit, setRightCommit] = useState("WORKTREE");
+  const [leftSha, setLeftSha] = useState("");
+  const [rightSha, setRightSha] = useState("");
   const pane = useRef<HTMLElement>(null);
   const scope = targetId === undefined ? "base" : `t${targetId}`;
+  const leftRef = pickRefs ? sideRef(leftBranch, leftCommit, leftSha) : "";
+  const rightRef = pickRefs ? sideRef(rightBranch, rightCommit, rightSha) : "";
 
   useEffect(() => {
-    let cancelled = false;
     setActiveDir(null);
     setActiveFile(null);
     setFullSection(null);
+  }, [project, feature, repo, targetId]);
+
+  useEffect(() => {
+    if (!pickRefs) return;
+    setLeftBranch(baseBranch);
+    setRightBranch(branch);
+    setLeftCommit("");
+    setRightCommit("WORKTREE");
+    setLeftSha("");
+    setRightSha("");
+  }, [pickRefs, project, feature, repo, baseBranch, branch]);
+
+  useEffect(() => {
+    if (!pickRefs) return;
+    let cancelled = false;
+    const query = new URLSearchParams({ feature, repo });
+    void fetch(`/api/projects/${encodeURIComponent(project)}/refs?${query.toString()}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await errorText(response));
+        return (await response.json()) as RefPayload;
+      })
+      .then((body) => {
+        if (!cancelled) setRefs(body);
+      })
+      .catch(() => {
+        if (!cancelled) setRefs(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickRefs, project, feature, repo, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
     const query = new URLSearchParams({ feature, repo, all: "1" });
     if (targetId !== undefined) query.set("target", String(targetId));
+    applyRefs(query, pickRefs, leftRef, rightRef);
     void fetch(`/api/projects/${encodeURIComponent(project)}/diff?${query.toString()}`)
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorText(response));
@@ -103,7 +241,7 @@ export function DiffPanel({
     return () => {
       cancelled = true;
     };
-  }, [project, feature, repo, refreshKey, targetId]);
+  }, [project, feature, repo, refreshKey, targetId, pickRefs, leftRef, rightRef]);
 
   useEffect(() => {
     if (mode !== "full" || !diff) return;
@@ -123,6 +261,7 @@ export function DiffPanel({
     setFullError(null);
     const query = new URLSearchParams({ feature, repo, file: activeFile, full: "1" });
     if (targetId !== undefined) query.set("target", String(targetId));
+    applyRefs(query, pickRefs, leftRef, rightRef);
     void fetch(`/api/projects/${encodeURIComponent(project)}/diff?${query.toString()}`)
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorText(response));
@@ -140,7 +279,7 @@ export function DiffPanel({
     return () => {
       cancelled = true;
     };
-  }, [mode, activeFile, project, feature, repo, refreshKey, targetId]);
+  }, [mode, activeFile, project, feature, repo, refreshKey, targetId, pickRefs, leftRef, rightRef]);
 
   useEffect(() => {
     if (mode !== "scroll" || !activeFile) return;
@@ -154,55 +293,90 @@ export function DiffPanel({
 
   const scrollSections = filesUnder(sectionsOf(diff), activeDir);
   const shown = mode === "full" ? (fullSection ? [fullSection] : []) : scrollSections;
+  const branches = branchChoices(refs?.branches, baseBranch, branch, leftBranch, rightBranch);
 
-  return (
-    <div
-      className={compact ? "detail-diff target-diff" : "detail-diff"}
-      style={{ ["--tree-width" as string]: `${treeWidth}px` }}
-    >
-      <section className="pane" aria-label="目录">
-        <h2>目录</h2>
-        {error ? <p className="muted">{error}</p> : null}
-        {diff?.error ? <p className="muted">{diff.error}</p> : null}
-        {diff && diff.files.length === 0 && !diff.error ? <p className="muted">{emptyText}</p> : null}
-        {diff && diff.files.length > 0 ? (
-          <FileTree
-            files={diff.files}
-            activeDir={activeDir}
-            activeFile={activeFile}
-            onAll={() => {
-              setActiveDir(null);
-              if (mode === "scroll") setActiveFile(null);
-              pane.current?.scrollTo({ top: 0 });
-            }}
-            onDir={(path) => {
-              setActiveDir(path);
-              if (mode === "scroll") setActiveFile(null);
-              pane.current?.scrollTo({ top: 0 });
-            }}
-            onFile={(path) => {
-              if (activeDir && path !== activeDir && !path.startsWith(`${activeDir}/`)) setActiveDir(null);
-              setActiveFile(path);
-            }}
-          />
-        ) : null}
-        {diff === null && !error ? <p className="muted">读取 diff</p> : null}
-      </section>
-      <DragBar
-        label="目录宽度"
-        value={treeWidth}
-        min={TREE_WIDTH.min}
-        max={TREE_WIDTH.max}
-        unit="px"
-        onChange={setTreeWidth}
-      />
+  const tree = (
+    <section className="pane" aria-label="目录">
+      <h2>目录</h2>
+      {error ? <p className="muted">{error}</p> : null}
+      {diff?.error ? <p className="muted">{diff.error}</p> : null}
+      {diff && diff.files.length === 0 && !diff.error ? <p className="muted">{emptyText}</p> : null}
+      {diff && diff.files.length > 0 ? (
+        <FileTree
+          files={diff.files}
+          activeDir={activeDir}
+          activeFile={activeFile}
+          onAll={() => {
+            setActiveDir(null);
+            if (mode === "scroll") setActiveFile(null);
+            pane.current?.scrollTo({ top: 0 });
+          }}
+          onDir={(path) => {
+            setActiveDir(path);
+            if (mode === "scroll") setActiveFile(null);
+            pane.current?.scrollTo({ top: 0 });
+          }}
+          onFile={(path) => {
+            if (activeDir && path !== activeDir && !path.startsWith(`${activeDir}/`)) setActiveDir(null);
+            setActiveFile(path);
+          }}
+        />
+      ) : null}
+      {diff === null && !error ? <p className="muted">读取 diff</p> : null}
+    </section>
+  );
+
+  const viewer = (
+    <>
       <section
         className={mode === "full" ? "pane diff-pane full-file" : "pane diff-pane"}
         aria-label="side-by-side diff"
         ref={pane}
         style={{ ["--diff-left" as string]: `${diffLeft}%` }}
       >
-        <h2>{heading}</h2>
+        {pickRefs ? (
+          <div className="ref-picks">
+            <RefPick
+              side="左"
+              branch={leftBranch}
+              commit={leftCommit}
+              sha={leftSha}
+              branches={branches}
+              commits={refs?.commits ?? []}
+              onBranch={(value) => {
+                setLeftBranch(value);
+                setLeftCommit("");
+                setLeftSha("");
+              }}
+              onCommit={(value) => {
+                setLeftCommit(value);
+                setLeftSha("");
+              }}
+              onSha={setLeftSha}
+            />
+            <RefPick
+              side="右"
+              branch={rightBranch}
+              commit={rightCommit}
+              sha={rightSha}
+              branches={branches}
+              commits={refs?.commits ?? []}
+              worktree
+              onBranch={(value) => {
+                setRightBranch(value);
+                setRightCommit("");
+                setRightSha("");
+              }}
+              onCommit={(value) => {
+                setRightCommit(value);
+                setRightSha("");
+              }}
+              onSha={setRightSha}
+            />
+          </div>
+        ) : (
+          <h2>{heading}</h2>
+        )}
         {diff ? (
           <p className="muted">
             {diff.base} · {diff.head}
@@ -241,6 +415,59 @@ export function DiffPanel({
         <button type="button" className={mode === "full" ? "on" : ""} aria-pressed={mode === "full"} title="点文件，看这个文件的完整 diff" onClick={() => setMode("full")}>全量</button>
         <button type="button" className={mode === "scroll" ? "on" : ""} aria-pressed={mode === "scroll"} title="在右侧连续滚动所有文件" onClick={() => setMode("scroll")}>滚动</button>
       </aside>
+    </>
+  );
+
+  return { tree, viewer };
+}
+
+function RefPick({
+  side,
+  branch,
+  commit,
+  sha,
+  branches,
+  commits,
+  worktree = false,
+  onBranch,
+  onCommit,
+  onSha,
+}: {
+  side: "左" | "右";
+  branch: string;
+  commit: string;
+  sha: string;
+  branches: string[];
+  commits: CommitOption[];
+  worktree?: boolean;
+  onBranch: (value: string) => void;
+  onCommit: (value: string) => void;
+  onSha: (value: string) => void;
+}) {
+  return (
+    <div className="ref-pick">
+      <span className="ref-side">{side}</span>
+      <span className="muted">branch</span>
+      <select aria-label={`${side} branch`} value={branch} onChange={(event) => onBranch(event.target.value)}>
+        {branches.map((name) => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </select>
+      <span className="muted">commit</span>
+      <select aria-label={`${side} commit`} value={commit} onChange={(event) => onCommit(event.target.value)}>
+        {worktree ? <option value="WORKTREE">工作区</option> : null}
+        <option value="">分支顶端</option>
+        {commits.map((item) => (
+          <option key={item.sha} value={item.sha}>{commitLabel(item)}</option>
+        ))}
+      </select>
+      <input
+        aria-label={`${side} SHA`}
+        placeholder="commit"
+        spellCheck={false}
+        value={sha}
+        onChange={(event) => onSha(event.target.value.trim())}
+      />
     </div>
   );
 }
@@ -320,6 +547,31 @@ function sectionsOf(diff: DiffPayload | null): DiffSection[] {
 
 function fileAnchor(path: string, scope: string): string {
   return `diff-file-${scope}-${path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+function sideRef(branch: string, commit: string, sha: string): string {
+  if (SHA.test(sha)) return sha;
+  if (commit) return commit;
+  return branch;
+}
+
+function applyRefs(query: URLSearchParams, pickRefs: boolean, left: string, right: string): void {
+  if (!pickRefs) return;
+  if (left) query.set("left", left);
+  if (right) query.set("right", right);
+}
+
+function branchChoices(loaded: string[] | undefined, ...extra: string[]): string[] {
+  const names = new Set(loaded ?? []);
+  for (const name of extra) {
+    if (name) names.add(name);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+function commitLabel(commit: CommitOption): string {
+  const subject = commit.subject.length > 48 ? `${commit.subject.slice(0, 48)}…` : commit.subject;
+  return `${commit.short} ${subject}`;
 }
 
 async function errorText(response: Response): Promise<string> {

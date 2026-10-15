@@ -116,6 +116,72 @@ h3 { margin: 0; font-size: 13px; font-weight: 650; }
   overflow: hidden;
 }
 
+.split-3 {
+  grid-template-columns: var(--nav-width, 340px) 6px var(--mid-width, 380px) 6px minmax(280px, 1fr);
+}
+
+.mid-col {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(180px, 48%);
+  overflow: hidden;
+}
+
+.mid-col > .detail-meta {
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mid-col > .pane {
+  min-height: 0;
+  border-right: 0;
+}
+
+.diff-col {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.diff-col > .pane { border-right: 0; }
+
+.ref-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.ref-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ref-side { font-weight: 650; }
+
+.ref-pick select,
+.ref-pick input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  max-width: 18em;
+}
+
+.ref-pick input {
+  width: 9em;
+  font-family: var(--mono);
+}
+
 .nav-pane, .detail-diff > .pane { border-right: 0; }
 
 .drag-bar {
@@ -539,7 +605,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 
 @media (max-width: 980px) {
   .app { height: auto; min-height: 100vh; overflow: visible; }
-  .split, .detail, .detail-diff {
+  .split, .split-3, .detail, .detail-diff, .mid-col, .diff-col {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
     height: auto;

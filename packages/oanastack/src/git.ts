@@ -70,6 +70,26 @@ export function defaultBranch(repo: string): string {
   return "main";
 }
 
+export interface CommitSummary {
+  sha: string;
+  short: string;
+  subject: string;
+}
+
+/** Recent commits on any local branch. Does not fetch. */
+export function recentCommits(repo: string, limit = 40): CommitSummary[] {
+  const result = git(repo, ["log", "-n", String(limit), "--all", "--format=%H%x09%h%x09%s"], { allowFail: true });
+  if (result.status !== 0) return [];
+  const commits: CommitSummary[] = [];
+  for (const line of result.stdout.split("\n")) {
+    if (!line.trim()) continue;
+    const [sha, short, ...rest] = line.split("\t");
+    if (!sha || !short) continue;
+    commits.push({ sha, short, subject: rest.join("\t") });
+  }
+  return commits;
+}
+
 export function listBranches(repo: string): string[] {
   const names = new Set<string>();
   for (const spec of ["refs/heads", "refs/remotes/origin"]) {

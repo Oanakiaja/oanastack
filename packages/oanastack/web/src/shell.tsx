@@ -2,9 +2,9 @@ import { useState } from "react";
 import { compareTaskOrder, onWorktree, taskRanges } from "../../src/task-range";
 import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Target } from "../../src/types.ts";
 import { featureCounts, recentResults, reviewLines, sumProgress } from "./board";
-import { DiffPanel } from "./diff-view";
+import { DiffColumns, DiffPanel } from "./diff-view";
 import { DragBar } from "./drag-bar";
-import { NAV_WIDTH, useStoredNumber } from "./layout-pref";
+import { MID_WIDTH, NAV_WIDTH, useStoredNumber } from "./layout-pref";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "./nav-tree";
@@ -36,9 +36,17 @@ export function Shell({
   const repo = feature?.repos.find((item) => item.name === repoName);
   const detail = feature && repo ? { feature, repo } : null;
   const [navWidth, setNavWidth] = useStoredNumber(NAV_WIDTH);
+  const [midWidth, setMidWidth] = useStoredNumber(MID_WIDTH);
+  const three = Boolean(detail && project);
 
   return (
-    <main className="split" style={{ ["--nav-width" as string]: `${navWidth}px` }}>
+    <main
+      className={three ? "split split-3" : "split"}
+      style={{
+        ["--nav-width" as string]: `${navWidth}px`,
+        ["--mid-width" as string]: `${midWidth}px`,
+      }}
+    >
       <section className="pane nav-pane" aria-label="项目">
         <h2>项目</h2>
         {overview && overview.projects.length === 0 ? (
@@ -80,27 +88,31 @@ export function Shell({
         unit="px"
         onChange={setNavWidth}
       />
-      <section className={detail ? "detail" : "pane overview-pane"} aria-label={detail ? "worktree" : project ? "汇总" : "总看板"}>
-        {detail && project ? (
-          <WorktreeDetail
-            project={project}
-            feature={detail.feature}
-            repo={detail.repo}
-            distance={distances[project.slug]?.[distanceKey(detail.feature.slug, detail.repo.name)]}
-            refreshKey={refreshKey}
-            onError={onError}
-            onReload={onReload}
-          />
-        ) : !overview ? (
-          <p className="muted">读取中</p>
-        ) : project ? (
-          <ProjectOverview project={project} onError={onError} onReload={onReload} />
-        ) : home ? (
-          <GlobalBoard projects={overview.projects} />
-        ) : (
-          <p className="muted">找不到这个项目。</p>
-        )}
-      </section>
+      {three && project && detail ? (
+        <WorktreeDetail
+          project={project}
+          feature={detail.feature}
+          repo={detail.repo}
+          distance={distances[project.slug]?.[distanceKey(detail.feature.slug, detail.repo.name)]}
+          refreshKey={refreshKey}
+          midWidth={midWidth}
+          onMidWidth={setMidWidth}
+          onError={onError}
+          onReload={onReload}
+        />
+      ) : (
+        <section className="pane overview-pane" aria-label={project ? "汇总" : "总看板"}>
+          {!overview ? (
+            <p className="muted">读取中</p>
+          ) : project ? (
+            <ProjectOverview project={project} onError={onError} onReload={onReload} />
+          ) : home ? (
+            <GlobalBoard projects={overview.projects} />
+          ) : (
+            <p className="muted">找不到这个项目。</p>
+          )}
+        </section>
+      )}
     </main>
   );
 }
@@ -319,6 +331,8 @@ function WorktreeDetail({
   repo,
   distance,
   refreshKey,
+  midWidth,
+  onMidWidth,
   onError,
   onReload,
 }: {
@@ -327,6 +341,8 @@ function WorktreeDetail({
   repo: FeatureRepoLink;
   distance: { ahead: number | null; behind: number | null } | undefined;
   refreshKey: number;
+  midWidth: number;
+  onMidWidth: (next: number) => void;
   onError: (message: string | null) => void;
   onReload: () => Promise<void>;
 }) {
@@ -367,45 +383,54 @@ function WorktreeDetail({
   }
 
   return (
-    <>
-      <div className="detail-meta">
-        <header className="detail-head">
-          <h2>{repo.name}</h2>
-          <p>
-            <StatusPill kind="feature" status={feature.status} />
-            <span className="muted">{feature.slug}</span>
-          </p>
-          <p className="mono">{repo.baseBranch} → {repo.branch}</p>
-          {away ? <p className="mono">{away}</p> : null}
-          {feature.goal ? <p className="muted">{feature.goal}</p> : null}
-          {repo.prUrl ? <p><a href={repo.prUrl}>PR</a></p> : null}
-        </header>
-        {actionable ? (
-          <div className="feature-actions">
-            <button className="chip" type="button" disabled={busy} onClick={() => void act("merge-local")}>本地 merge</button>
-            <button className="chip" type="button" disabled={busy} onClick={() => void act("merge")}>merge</button>
-            <button className="chip" type="button" disabled={busy} onClick={() => void act("close")}>关闭</button>
-            <button className="chip" type="button" disabled={busy} onClick={() => void act("abandon")}>放弃</button>
-          </div>
-        ) : null}
-        <RoundList rounds={repo.rounds} />
-        {targets.length === 0 ? <p className="muted">还没有 target。</p> : null}
-        <ul className="target-list">
-          {targets.map((target) => (
-            <TargetBlock
-              key={target.id}
-              target={target}
-              range={ranges.find((item) => item.id === target.id)}
-              project={project.slug}
-              feature={feature.slug}
-              repo={repo.name}
-              refreshKey={refreshKey}
-            />
-          ))}
-        </ul>
-      </div>
-      <DiffPanel project={project.slug} feature={feature.slug} repo={repo.name} refreshKey={refreshKey} />
-    </>
+    <DiffColumns
+      project={project.slug}
+      feature={feature.slug}
+      repo={repo.name}
+      baseBranch={repo.baseBranch}
+      branch={repo.branch}
+      refreshKey={refreshKey}
+      midWidth={midWidth}
+      onMidWidth={onMidWidth}
+      meta={
+        <>
+          <header className="detail-head">
+            <h2>{repo.name}</h2>
+            <p>
+              <StatusPill kind="feature" status={feature.status} />
+              <span className="muted">{feature.slug}</span>
+            </p>
+            <p className="mono">{repo.baseBranch} → {repo.branch}</p>
+            {away ? <p className="mono">{away}</p> : null}
+            {feature.goal ? <p className="muted">{feature.goal}</p> : null}
+            {repo.prUrl ? <p><a href={repo.prUrl}>PR</a></p> : null}
+          </header>
+          {actionable ? (
+            <div className="feature-actions">
+              <button className="chip" type="button" disabled={busy} onClick={() => void act("merge-local")}>本地 merge</button>
+              <button className="chip" type="button" disabled={busy} onClick={() => void act("merge")}>merge</button>
+              <button className="chip" type="button" disabled={busy} onClick={() => void act("close")}>关闭</button>
+              <button className="chip" type="button" disabled={busy} onClick={() => void act("abandon")}>放弃</button>
+            </div>
+          ) : null}
+          <RoundList rounds={repo.rounds} />
+          {targets.length === 0 ? <p className="muted">还没有 target。</p> : null}
+          <ul className="target-list">
+            {targets.map((target) => (
+              <TargetBlock
+                key={target.id}
+                target={target}
+                range={ranges.find((item) => item.id === target.id)}
+                project={project.slug}
+                feature={feature.slug}
+                repo={repo.name}
+                refreshKey={refreshKey}
+              />
+            ))}
+          </ul>
+        </>
+      }
+    />
   );
 }
 
