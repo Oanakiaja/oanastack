@@ -64,7 +64,7 @@ typed body 只有两张，所以第一张实现 PR 只挂这两张：
 - `babysit` → `BabysitResult`（`mode`、`frontier`、`actions`、`remaining`、`stopped_before_merge: true`）。
 - `review` → `ReviewResult`（`intent_aligned`、`risks`、`test_gaps`、`comments`、`verdict`）。
 
-其余 playbook 继续用 `DeferredResult`（`kind: deferred` + 今天的散文回复），直到有单独的需要。实现时对照 #16 的例子 `references/examples/babysit.conclusion.json` 和 `review.conclusion.json`。#16 还在草案上时，babysit / review 的散文回复保持原样。
+其余 playbook 继续用 `DeferredResult`（`kind: deferred` + 今天的散文回复），直到有单独的需要。实现时对照 #16 的例子 `references/examples/babysit.conclusion.json` 和 `review.conclusion.json`。#16 还在草案上时，babysit / review 的散文回复保持原样。散文回复和以后的结论都按 `principles.md` 的「使用方式」写明：用了哪条原则或 skill，改了哪个决定。
 
 ### 3. 用自己的话对齐，再写代码
 
