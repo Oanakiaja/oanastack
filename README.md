@@ -133,12 +133,12 @@ Worktree 平面仍是 Worktrunk（`wt`）/ `oana feature`；不要用 grokc 另�
 - 修 bug：`playbooks/bugfix.md`
 - 验证：`playbooks/test.md`
 - 看 diff：`playbooks/review.md`
-- 盯 PR 到 merge-ready：`playbooks/babysit.md`
+- 盯 feature→main 到 merge-ready（review + e2e，只通知）：`playbooks/babysit.md`
 - CI 分诊：`playbooks/cicd.md`
 - 清理 worktree：`playbooks/cleanup.md`
 - 沉淀 / 复盘：`playbooks/reflect.md`
 
-merge / land / ship 不在 playbook 里做：`babysit.md` 到 merge-ready 后由 owner 合入。
+merge / land / ship 不在 playbook 里做：`babysit.md` 在 review 与 e2e 之后只通知 owner，由 owner 合入。
 
 ## UI / Electron 状态
 
