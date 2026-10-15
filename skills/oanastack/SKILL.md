@@ -12,7 +12,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - 调研：`playbooks/research.md`
 - Agent readiness 评估（`/agent-readiness-report`）：`../agent-readiness-report/SKILL.md`（独立通用量表，只评估，不自动修复）
 - 开 feature / 多仓并行：`references/feature-session.md` + `playbooks/feat.md`
-- 长 coding session（`oana grokc`）：`../grokc-local-coding-agents/SKILL.md`
+- 长 coding session（herdr）：`../herdr-grokbot/SKILL.md`
 - 功能开发参考：`references/feature.md`
 - UI 状态（数据源 / 建模 / Electron）：`references/ui-state.md`
 - UI oxlint 循环（模板）：`references/ui-state-oxlint.md`（`references/templates/oxlintrc.react.json`）
@@ -27,6 +27,6 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 - 清理 worktree：`playbooks/cleanup.md`
 - 沉淀 / 架构反思：`playbooks/reflect.md`（`references/reflect.md`）
 
-多仓 feature 推荐先用 `oana` CLI 创建/清理 worktree，再把 session cwd 指向对应 worktree。长 coding session 在该 worktree 内用 `oana grokc`（skill：`../grokc-local-coding-agents/SKILL.md`）；不要另起一套 worktree 平面。grokc 的产品入口只在本仓（`packages/grokbot-coding-agent/` + `oana grokc`），不要指向独立 grokc CLI 仓库。
+多仓 feature 推荐先用 `oana` CLI 创建/清理 worktree，再把 session cwd 指向对应 worktree。长 coding session 在该 worktree 内用 herdr 驱动本机 Codex（skill：`../herdr-grokbot/SKILL.md`）；不要另起一套 worktree 平面。
 
 Playbook 路由：匹配任务后，把对应 playbook 的步骤原样抄到 todo（见 `playbooks/README.md`）。本层是薄适配，不是 pstack 全量分叉。骨干仍是：一个 feature → `oana` 多仓 worktree → 做完再批量 merge。merge / land / ship 没有独立 playbook，babysit 到 merge-ready 后由 owner 合入。禁止直接改生产环境配置。
