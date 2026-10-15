@@ -115,11 +115,13 @@ export function DiffPanel({
   );
 }
 
-/** Worktree page: file tree in the middle column, diff in the third, with branch/commit pickers. */
+/** Worktree page: meta, file tree, and diff are separate full-height columns. */
 export function DiffColumns({
   meta,
   midWidth,
   onMidWidth,
+  treeWidth,
+  onTreeWidth,
   ...props
 }: DiffModelProps & {
   baseBranch: string;
@@ -127,22 +129,33 @@ export function DiffColumns({
   meta: ReactNode;
   midWidth: number;
   onMidWidth: (next: number) => void;
+  treeWidth: number;
+  onTreeWidth: (next: number) => void;
 }) {
   const model = useDiffModel({ ...props, pickRefs: true });
   return (
     <>
-      <section className="mid-col" aria-label="worktree">
-        <div className="detail-meta">{meta}</div>
-        {model.tree}
+      <section className="meta-col" aria-label="worktree">
+        {meta}
       </section>
       <DragBar
         className="drag-bar split-mid"
-        label="目录栏宽度"
+        label="信息栏宽度"
         value={midWidth}
         min={MID_WIDTH.min}
         max={MID_WIDTH.max}
         unit="px"
         onChange={onMidWidth}
+      />
+      {model.tree}
+      <DragBar
+        className="drag-bar split-tree"
+        label="目录栏宽度"
+        value={treeWidth}
+        min={TREE_WIDTH.min}
+        max={TREE_WIDTH.max}
+        unit="px"
+        onChange={onTreeWidth}
       />
       <section className="diff-col" aria-label="diff">
         {model.viewer}
@@ -296,7 +309,7 @@ function useDiffModel({
   const branches = branchChoices(refs?.branches, baseBranch, branch, leftBranch, rightBranch);
 
   const tree = (
-    <section className="pane" aria-label="目录">
+    <section className="pane tree-col" aria-label="目录">
       <h2>目录</h2>
       {error ? <p className="muted">{error}</p> : null}
       {diff?.error ? <p className="muted">{diff.error}</p> : null}

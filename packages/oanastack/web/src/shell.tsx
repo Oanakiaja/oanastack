@@ -4,7 +4,7 @@ import type { Completion, Feature, FeatureRepoLink, Overview, Project, Round, Ta
 import { featureCounts, recentResults, reviewLines, sumProgress } from "./board";
 import { DiffColumns, DiffPanel } from "./diff-view";
 import { DragBar } from "./drag-bar";
-import { MID_WIDTH, NAV_WIDTH, useStoredNumber } from "./layout-pref";
+import { MID_WIDTH, NAV_WIDTH, TREE_WIDTH, useStoredNumber } from "./layout-pref";
 import { formatTime } from "./labels";
 import { StatusPill } from "./status-pill";
 import { distanceText, groupByBase, worktreeName, type WorktreeNode } from "./nav-tree";
@@ -37,14 +37,16 @@ export function Shell({
   const detail = feature && repo ? { feature, repo } : null;
   const [navWidth, setNavWidth] = useStoredNumber(NAV_WIDTH);
   const [midWidth, setMidWidth] = useStoredNumber(MID_WIDTH);
-  const three = Boolean(detail && project);
+  const [treeWidth, setTreeWidth] = useStoredNumber(TREE_WIDTH);
+  const columns = Boolean(detail && project);
 
   return (
     <main
-      className={three ? "split split-3" : "split"}
+      className={columns ? "split split-4" : "split"}
       style={{
         ["--nav-width" as string]: `${navWidth}px`,
         ["--mid-width" as string]: `${midWidth}px`,
+        ["--tree-width" as string]: `${treeWidth}px`,
       }}
     >
       <section className="pane nav-pane" aria-label="项目">
@@ -88,7 +90,7 @@ export function Shell({
         unit="px"
         onChange={setNavWidth}
       />
-      {three && project && detail ? (
+      {columns && project && detail ? (
         <WorktreeDetail
           project={project}
           feature={detail.feature}
@@ -97,6 +99,8 @@ export function Shell({
           refreshKey={refreshKey}
           midWidth={midWidth}
           onMidWidth={setMidWidth}
+          treeWidth={treeWidth}
+          onTreeWidth={setTreeWidth}
           onError={onError}
           onReload={onReload}
         />
@@ -333,6 +337,8 @@ function WorktreeDetail({
   refreshKey,
   midWidth,
   onMidWidth,
+  treeWidth,
+  onTreeWidth,
   onError,
   onReload,
 }: {
@@ -343,6 +349,8 @@ function WorktreeDetail({
   refreshKey: number;
   midWidth: number;
   onMidWidth: (next: number) => void;
+  treeWidth: number;
+  onTreeWidth: (next: number) => void;
   onError: (message: string | null) => void;
   onReload: () => Promise<void>;
 }) {
@@ -392,6 +400,8 @@ function WorktreeDetail({
       refreshKey={refreshKey}
       midWidth={midWidth}
       onMidWidth={onMidWidth}
+      treeWidth={treeWidth}
+      onTreeWidth={onTreeWidth}
       meta={
         <>
           <header className="detail-head">
