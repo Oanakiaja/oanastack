@@ -2,7 +2,7 @@
 
 Design only. Nothing in this document is implemented, and none of it authorizes a merge.
 
-This note models oanastack on [REA](https://github.com/morluto/rea) at commit `ed084b3dbb13ec9dee1adc8f5b76e784b52c00bb` (`ed084b3`). REA is MIT, copyright 2026 morluto. The ideas adapted here are the inward layering, the Evidence record, question-shaped tools, generated catalogs, `setup` then `doctor`, restrained skills, and a CI split between real engines and agent tool-selection. oanastack does not vendor REA source. Playbooks, worktrees, `oana grokc`, herdr, and the progress dashboard stay oanastack's.
+This note models oanastack on [REA](https://github.com/morluto/rea) at commit `ed084b3dbb13ec9dee1adc8f5b76e784b52c00bb` (`ed084b3`). REA is MIT, copyright 2026 morluto. The ideas adapted here are the inward layering, the Evidence record, question-shaped tools, generated catalogs, `setup` then `doctor`, restrained skills, and a CI split between real engines and agent tool-selection. oanastack does not vendor REA source. Playbooks, worktrees, herdr, and the progress dashboard stay oanastack's.
 
 REA was read at that commit, not from memory:
 
@@ -19,12 +19,11 @@ REA was read at that commit, not from memory:
 
 ## Where oanastack is now
 
-`main` (`0c6abd4`) is a skill and bash CLI repo.
+`main` (`b0e34cd`) is a skill and bash CLI repo.
 
 - Playbooks in `skills/oanastack/playbooks/` are step cards. Each ends in a prose **回复**. Babysit reports mode, frontier PR, `gh` state, what was fixed or rejected, what is left, and what a person must decide. Review reports intent, risk, test gaps, comments or LGTM, and what the author must decide. Those sentences are the first two typed bodies below.
-- `bin/oana` maps aliases in `~/.config/oanastack/repos.toml`, then opens Worktrunk worktrees under `~/.local/state/oanastack/features`. One feature, one branch name, one worktree per repo. Session cwd is the worktree.
-- `oana grokc` (`packages/grokbot-coding-agent`) drives a local coding agent. `CodexHarness` is real. `cursor-cli`, `claude-code`, and `kimi` are stubs. `src/cloud-agent.ts` is a separate client for a Cursor cloud agent (`launch`, `reply`, `get`, `watch`, `approve`, …). The cloud client is not the `cursor-cli` stub.
-- `skills/herdr-grokbot/` is how a cloud Grok bot drives a local Codex pane through [herdr](https://github.com/herdrdev/herdr). Herdr's own statuses are `idle`, `working`, `blocked`, `done`, and `unknown`. The skill says not to use that loop for `oana grokc` or a Cursor cloud agent.
+- `bin/oana` maps aliases in `~/.config/oanastack/repos.toml`, then opens Worktrunk worktrees under `~/.local/state/oanastack/features`. One feature, one branch name, one worktree per repo. Session cwd is the worktree. Worktree isolation stays on `oana` / `wt`.
+- Long and local coding sessions use `skills/herdr-grokbot/SKILL.md`. A cloud Grok bot drives a local Codex pane through [herdr](https://github.com/herdrdev/herdr), with the session cwd set to the feature worktree. Herdr's own statuses are `idle`, `working`, `blocked`, `done`, and `unknown`. This loop does not replace a Cursor cloud agent.
 - `skills/agent-readiness-report/` already grades `pass`, `fail`, `unknown`, `blocked`, and `n/a`, and labels evidence `static`, `executed`, or `external`. Unknown stays visible.
 - Install is manual `ln -s` from the README: skills into `~/.agents/skills` (Claude paths optional), `bin/oana` into `~/.local/bin`, and a copied `repos.toml`.
 
@@ -32,12 +31,12 @@ Pull request [#14](https://github.com/Oanakiaja/oanastack/pull/14), branch `curs
 
 ## Layering
 
-Dependencies point inward. Domain types do not import an executor, the CLI, or MCP. Adapters may depend on domain types. Application flows may depend on the executor port and on domain types. They do not import herdr's socket protocol, the Codex CLI's JSONL, `cloud-agent.ts`, or a git.woa.com client. Entrypoints call application flows and do not reimplement them.
+Dependencies point inward. Domain types do not import an executor, the CLI, or MCP. Adapters may depend on domain types. Application flows may depend on the executor port and on domain types. They do not import herdr's socket protocol, a Codex CLI transcript, a Cursor cloud client, or a git.woa.com client. Entrypoints call application flows and do not reimplement them.
 
 ```mermaid
 flowchart BT
   domain["domain<br/>Evidence, Conclusion, JSON Schema"]
-  adapters["executor adapters<br/>local Codex, herdr, Cursor cloud, Codex on git.woa.com"]
+  adapters["executor adapters<br/>herdr, Cursor cloud, Codex on git.woa.com"]
   application["application<br/>playbook flows, routing, setup, doctor"]
   entry["entrypoints<br/>oana CLI and, later, MCP"]
   adapters --> domain
@@ -55,7 +54,7 @@ An arrow means "depends on".
 | Application | Playbook flows shared by the CLI and MCP. Routing. Setup plan and doctor. | Executor wire formats. Merge, land, and ship. |
 | Entrypoints | `oana` argv, later MCP tool registration, exit codes. | A second copy of babysit or review. |
 
-`packages/grokbot-coding-agent` stays an adapter implementation for local Codex and the Cursor cloud client. It is not the domain, and it is not where playbook conclusions are defined. The dashboard store, after #14, is also outside the domain: it can point at a conclusion, and it does not become the Evidence type.
+Long and local coding sessions go through `skills/herdr-grokbot/`. That skill is not the domain, and it is not where playbook conclusions are defined. The dashboard store, after #14, is also outside the domain: it can point at a conclusion, and it does not become the Evidence type.
 
 Composition (a later wiring module) constructs adapters and passes them into application flows. Tests of a flow use a recording adapter. That recording adapter does not establish that Codex, herdr, Cursor, or git.woa.com behaved that way.
 
@@ -136,7 +135,7 @@ A playbook states the question and the evidence it needs. It does not name Codex
 ```ts
 // Draft only. Not compiled in this PR.
 
-type ExecutorId = "local-codex" | "herdr" | "cursor-cloud" | "codex-woa";
+type ExecutorId = "herdr" | "cursor-cloud" | "codex-woa";
 
 interface RepoRouteFacts {
   /** From `git remote get-url`, not from the alias in repos.toml. */
@@ -187,20 +186,17 @@ flowchart LR
 
 Rules:
 
-1. An explicit caller override is the whole decision, including `local-codex` and `herdr`. Record it as observed (the caller said so) on the run's parameters.
+1. An explicit caller override is the whole decision, including `herdr`. Record it as observed (the caller said so) on the run's parameters.
 2. Otherwise, if the remote host is `git.woa.com` or a subdomain, select `codex-woa`. In the routing sentence, "Codex" means this adapter.
 3. Otherwise, if a host was resolved, select `cursor-cloud`.
 4. If the remote URL cannot be read, the decision is `unresolved-host`. Stop and ask. Do not guess `cursor-cloud`.
-5. `local-codex` and `herdr` are not inferred from the host. A worktree on the laptop does not by itself select them. Both need a machine the caller already chose: `oana grokc` for local Codex, and an approved remote shell plus a herdr pane for herdr.
+5. `herdr` is not inferred from the host. A worktree on the laptop does not by itself select it. It needs a machine the caller already chose: an approved remote shell plus a herdr pane (`skills/herdr-grokbot/SKILL.md`). Session cwd is the feature worktree. Worktree isolation stays on `oana` / `wt`.
 
 | Id | Today | Adapter notes |
 | --- | --- | --- |
-| `local-codex` | `oana grokc --harness codex`, `CodexHarness` | Session cwd is the feature worktree. Approvals stay pending unless the user asked for auto-approve. |
-| `herdr` | `skills/herdr-grokbot/` | Record herdr's status string as observed. Do not invent a second enum. Webhook URLs and Authorization stay in `~/.config/herdr/grokbot-webhook.env`. |
-| `cursor-cloud` | `packages/grokbot-coding-agent/src/cloud-agent.ts` | This is the cloud agent client. It is not the `cursor-cli` harness stub. |
+| `herdr` | `skills/herdr-grokbot/SKILL.md` | Long and local coding sessions. Record herdr's status string as observed. Do not invent a second enum. Webhook URLs and Authorization stay in `~/.config/herdr/grokbot-webhook.env`. Session cwd is the feature worktree. |
+| `cursor-cloud` | Not in the repo | Cursor cloud agent. No in-repo client on current main. |
 | `codex-woa` | Not in the repo | Codex on git.woa.com. Internal remotes only. No protocol is specified here. |
-
-`HarnessId` (`codex`, `cursor-cli`, `claude-code`, `kimi`) remains the grokc session switch. It is not this four-way executor id. Folding `cursor-cli` into `cursor-cloud` would point routing at a stub.
 
 ## 3. `oana setup` and `oana doctor`
 
@@ -225,7 +221,6 @@ Default plan, sources relative to the oanastack checkout:
 | Source in the checkout | Destination |
 | --- | --- |
 | `skills/oanastack` | `~/.agents/skills/oanastack` |
-| `skills/grokc-local-coding-agents` | `~/.agents/skills/grokc-local-coding-agents` |
 | `skills/herdr-grokbot` | `~/.agents/skills/herdr-grokbot` |
 | `skills/agent-readiness-report` | `~/.agents/skills/agent-readiness-report` |
 | `bin/oana` | `~/.local/bin/oana` |
@@ -322,7 +317,7 @@ The tool catalog is generated from the contracts, the way REA generates `scripts
 CI has three lanes:
 
 1. **Fast lane.** Schema validation, domain id vectors (the two examples in this directory), playbook flows against a recording adapter. No network.
-2. **Real-executor lane.** One scenario per executor that is actually configured: local Codex, herdr when its socket is up, Cursor cloud when its credentials are present, Codex on git.woa.com only on a runner that can reach that host. A stub harness or a fake adapter does not pass this lane. Skip with a named reason when the executor is not configured; do not mark the scenario passed.
+2. **Real-executor lane.** One scenario per executor that is actually configured: herdr when its socket is up, Cursor cloud when its credentials are present, Codex on git.woa.com only on a runner that can reach that host. A fake adapter does not pass this lane. Skip with a named reason when the executor is not configured; do not mark the scenario passed.
 3. **Agent tool-selection evals.** A real host agent, disposable config, scenarios that name the expected first tool. Include a negative case whose expected first tool is null (the user said "this PR" and did not give a repository). Record host, model, catalog digest, selected tools, arguments, errors, retries, and whether the task's claims matched the Evidence. Keyword overlap in the final prose does not pass the lane.
 
 ## Optional next steps
@@ -348,14 +343,14 @@ The later skill rewrite replaces the "read every card" opening with this shape. 
 ```markdown
 ---
 name: oanastack
-description: Route oanastack playbooks and return a conclusion with evidence. Use for research, a multi-repo feature, a bugfix, tests, review, babysitting a PR, CI triage, worktree cleanup, or a retro. Skip for a merge, a production config edit, an oana grokc session, or a herdr Codex pane.
+description: Route oanastack playbooks and return a conclusion with evidence. Use for research, a multi-repo feature, a bugfix, tests, review, babysitting a PR, CI triage, worktree cleanup, or a retro. Skip for a merge, a production config edit, or a herdr Codex pane.
 ---
 
 # oanastack
 
 Skip this skill when the user is merging or shipping, editing production
-configuration, driving a local coding agent (`grokc-local-coding-agents`),
-or driving Codex through herdr (`herdr-grokbot`). Installing the skill does
+configuration, or driving a long or local coding session through herdr
+(`skills/herdr-grokbot/SKILL.md`). Installing the skill does
 not register MCP and does not run setup. If the tools are already listed,
 use them. Run doctor only for a broken link or a missing command you hit.
 
@@ -400,7 +395,7 @@ Adapted from REA's `docs/tool-design.md` for oanastack questions. Use it when ad
    - `trace` — review thread to commit to CI job, with unresolved hops kept.
    - `compare` — two oids, base versus head, previous readiness report versus this one. Static difference is not a cause.
    - `workflow` — a repeated outcome: babysit check, review, start feature, readiness. Inline summary, contributing Evidence, partial facets.
-   - `observe` — an executor run, a herdr pane, a grokc session. Authority, lifecycle, and cleanup. Observing a session does not widen its cwd or its approval mode.
+   - `observe` — an executor run or a herdr pane. Authority, lifecycle, and cleanup. Observing a session does not widen its cwd or its approval mode.
 6. Strict inputs. Required identity (repository and number, or path). Drop flags the handler ignores.
 7. Return Evidence inline: provider, subject digest, locations, confidence, limitations, links. Uncovered coverage is an unknown, with an id.
 8. Keep observed, derived, and inferred distinct. A provider that omits a field leaves it unknown; it does not force every executor to invent the same metadata.
@@ -415,16 +410,15 @@ Implementation is a sequence of small PRs. This one does not start them.
 1. **Domain package.** JSON Schema, a zod mirror, and id functions. Unit tests are the two examples in `references/examples/`. No I/O.
 2. **Babysit and review flows.** Pure functions from already-fetched forge and command observations to a conclusion. Recording fixtures only.
 3. **Executor port and routing.** The decision table above, plus a fake adapter. No network.
-4. **`local-codex` adapter.** Wrap `CodexHarness`. Do not retarget the `cursor-cli` stub.
-5. **`cursor-cloud` adapter.** Wrap `cloud-agent.ts`.
-6. **`herdr` adapter.** Herdr status strings stay observed. Do not parse pane text into a private status list.
-7. **`codex-woa` adapter.** git.woa.com only, behind the host rule.
-8. **`oana setup` and `oana doctor`.** Then update the README so the `ln -s` blocks point at setup.
-9. **Remaining playbook bodies.** Replace `deferred` for feat, bugfix, test, cicd, research, cleanup, reflect, and readiness.
-10. **Catalog generator and MCP.** `start_feature`, `check_pr`, `readiness_report`, and `inspect_evidence` if paging needs a tool. CI checks the generated catalog.
-11. **Skill rewrite.** Apply the template. Leave step cards where they are.
-12. **CI lanes.** Fast, real-executor, and agent tool-selection.
-13. **Dashboard citation.** After #14 merges: completions may store a `conclusion_id`. Do not merge the Worktrunk plane with `~/.oanastack` workspaces.
+4. **`herdr` adapter.** Herdr status strings stay observed. Do not parse pane text into a private status list. Long and local coding sessions use `skills/herdr-grokbot/SKILL.md`. Worktree isolation stays on `oana` / `wt`.
+5. **`cursor-cloud` adapter.** No client is in the repo. Add one here. Do not add a second local coding CLI.
+6. **`codex-woa` adapter.** git.woa.com only, behind the host rule.
+7. **`oana setup` and `oana doctor`.** Then update the README so the `ln -s` blocks point at setup.
+8. **Remaining playbook bodies.** Replace `deferred` for feat, bugfix, test, cicd, research, cleanup, reflect, and readiness.
+9. **Catalog generator and MCP.** `start_feature`, `check_pr`, `readiness_report`, and `inspect_evidence` if paging needs a tool. CI checks the generated catalog.
+10. **Skill rewrite.** Apply the template. Leave step cards where they are.
+11. **CI lanes.** Fast, real-executor, and agent tool-selection.
+12. **Dashboard citation.** After #14 merges: completions may store a `conclusion_id`. Do not merge the Worktrunk plane with `~/.oanastack` workspaces.
 
 ## Credit
 
