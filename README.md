@@ -98,7 +98,7 @@ oana feature done agent-collab
 
 ## Playbooks（借鉴 pstack）
 
-薄 playbook 层，不替换 `oana` 骨干（一个 feature → 多仓 worktree → 做完再批量 merge）。Agent 按任务匹配后把步骤抄到 todo。索引与路由见 `skills/oanastack/playbooks/README.md`。
+薄 playbook 层，不替换 `oana` 骨干（一个 feature → 多仓 worktree → 做完再批量 merge）。Agent 按任务匹配后把步骤抄到 todo。索引与路由见 `skills/oanastack/playbooks/README.md`。原则在 `skills/oanastack/references/principles.md`。把 poteto 近期做法折进来的设计图在 `skills/oanastack/references/poteto-fold.md`（草案，playbook 步骤尚未改）。
 
 - 调研：`playbooks/research.md`
 - 开 feature / 多仓：`playbooks/feat.md`

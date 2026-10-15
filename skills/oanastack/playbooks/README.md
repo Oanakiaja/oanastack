@@ -2,7 +2,7 @@
 
 薄 playbook 层：路由 / 调研先于动手 / CI 先分类再重试 / review 与 babysit 分离 / worktree 清理 / 按门槛复盘。
 
-**不是 pstack 全量分叉。** 骨干仍是 oanastack 自己的：一个 feature → `oana` 多仓 worktree → 做完再批量 merge。这里只给 Agent 可抄的步骤卡，不引入 Graphite、不 vendor pstack 脚本、不改个人 `~/` 配置。
+**不是 pstack 全量分叉。** 骨干仍是 oanastack 自己的：一个 feature → `oana` 多仓 worktree → 做完再批量 merge。这里只给 Agent 可抄的步骤卡，不引入 Graphite、不 vendor pstack 脚本、不改个人 `~/` 配置。poteto 近期做法的落点在 `../references/poteto-fold.md`（思想已在 `../references/principles.md`）。本索引不因此增加 playbook。
 
 ## 路由
 

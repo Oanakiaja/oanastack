@@ -7,7 +7,7 @@ description: oanastack 协作规则与常见工作流（调研、开 feature、�
 
 优先阅读：
 
-- 原则：`references/principles.md`
+- 原则：`references/principles.md`（思想已写入；折进 poteto 的落点图：`references/poteto-fold.md`，playbook 步骤尚未改）。做判断时按其中「使用方式」写出用了哪条原则或 skill、改了哪个选择。
 - Playbook 路由：`playbooks/README.md`（匹配后把步骤原样抄到 todo）
 - 调研：`playbooks/research.md`
 - Agent readiness 评估（`/agent-readiness-report`）：`../agent-readiness-report/SKILL.md`（独立通用量表，只评估，不自动修复）
